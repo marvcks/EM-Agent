@@ -31,6 +31,16 @@ services:
 
 
 class DeploymentTests(unittest.TestCase):
+    def test_reaction_mounts_have_independent_readonly_lifecycle(self):
+        result = deploy.render_compose(COMPOSE, NEW_IMAGE, reaction_tools=True)
+        for source, destination in deploy.REACTION_MOUNTS.items():
+            self.assertIn(f'{source}:{destination}:ro', result)
+        self.assertNotIn('/opt/em-agent-tools/magus', result)
+        self.assertEqual(deploy.render_compose(result, NEW_IMAGE, reaction_tools=True), result)
+        self.assertNotIn('/opt/em-agent-tools/aizynthfinder', deploy.render_compose(COMPOSE, OLD_IMAGE, remove_frontend=False))
+        with self.assertRaises(ValueError):
+            deploy.render_compose(COMPOSE.replace('    volumes:\n', '    volumes:\n      - /other:/opt/em-agent-tools/python:ro\n'), NEW_IMAGE, reaction_tools=True)
+
     def test_magus_mounts_are_readonly_idempotent_and_not_added_to_rollback(self):
         result = deploy.render_compose(COMPOSE, NEW_IMAGE, science_tools=True)
         for source, destination in deploy.SCIENCE_MOUNTS.items():

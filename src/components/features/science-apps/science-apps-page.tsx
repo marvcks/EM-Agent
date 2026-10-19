@@ -29,11 +29,15 @@ import {
   type ScienceJobStatus,
 } from "#/api/science-apps-service";
 
+import { ReactionForm } from "./reaction-form";
+
 const DESCRIPTION_KEYS = {
   xtb: I18nKey.SCIENCE$XTB_DESCRIPTION,
   orca: I18nKey.SCIENCE$ORCA_DESCRIPTION,
   gaussian: I18nKey.SCIENCE$GAUSSIAN_DESCRIPTION,
   magus: I18nKey.SCIENCE$MAGUS_DESCRIPTION,
+  aizynthfinder: I18nKey.SCIENCE$AIZYNTH_DESCRIPTION,
+  lcms2yield: I18nKey.SCIENCE$LCMS_DESCRIPTION,
 };
 const STATUS_KEYS: Record<ScienceJobStatus, I18nKey> = {
   queued: I18nKey.SCIENCE$QUEUED,
@@ -43,6 +47,9 @@ const STATUS_KEYS: Record<ScienceJobStatus, I18nKey> = {
   cancelled: I18nKey.SCIENCE$CANCELLED,
 };
 const ERROR_KEYS: Record<string, I18nKey> = {
+  invalid_smiles: I18nKey.SCIENCE$INVALID_SMILES,
+  invalid_reaction_input: I18nKey.SCIENCE$INVALID_SMILES,
+  invalid_method: I18nKey.SCIENCE$INVALID_SMILES,
   invalid_xyz: I18nKey.SCIENCE$INVALID_XYZ,
   invalid_spin: I18nKey.SCIENCE$INVALID_SPIN,
   app_unavailable: I18nKey.SCIENCE$UNAVAILABLE,
@@ -58,12 +65,14 @@ const CATEGORY_KEYS = {
   quantum: I18nKey.SCIENCE$QUANTUM,
   semiempirical: I18nKey.SCIENCE$SEMIEMPIRICAL,
   crystal: I18nKey.SCIENCE$CRYSTAL,
+  reaction: I18nKey.SCIENCE$REACTION,
 };
 const SCIENCE_CATEGORIES = [
   "all",
   "quantum",
   "semiempirical",
   "crystal",
+  "reaction",
 ] as const;
 const OFF23_MODEL_SIZES = ["small", "medium", "large"] as const;
 const SEARCH_FIELDS = [
@@ -216,11 +225,20 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
               </span>
             </div>
             <div className="em-science-workbench">
-              <ScienceForm
-                key={selected.id}
-                app={selected}
-                onCreated={onSelectJob}
-              />
+              {selected.category === "reaction" ? (
+                <ReactionForm
+                  key={selected.id}
+                  app={selected}
+                  onCreated={onSelectJob}
+                  renderError={(error) => <ErrorMessage error={error} />}
+                />
+              ) : (
+                <ScienceForm
+                  key={selected.id}
+                  app={selected}
+                  onCreated={onSelectJob}
+                />
+              )}
               <JobResult jobId={jobId} />
             </div>
           </>
@@ -306,7 +324,13 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                   <p>{t(DESCRIPTION_KEYS[app.id])}</p>
                   <div className="em-science-card-tags">
                     <span>{t(CATEGORY_KEYS[app.category])}</span>
-                    <span>{t(I18nKey.SCIENCE$XYZ_INPUT)}</span>
+                    <span>
+                      {t(
+                        app.category === "reaction"
+                          ? I18nKey.SCIENCE$SMILES_INPUT
+                          : I18nKey.SCIENCE$XYZ_INPUT,
+                      )}
+                    </span>
                   </div>
                   <div className="em-science-card-footer">
                     <span>{t(I18nKey.SCIENCE$OPEN_APP)}</span>
@@ -770,6 +794,36 @@ function JobResult({ jobId }: { jobId: string | null }) {
             <p className="em-science-help">
               {t(I18nKey.SCIENCE$MAGUS_RESULT_NOTE)}
             </p>
+          )}
+          {job.status === "succeeded" && job.result?.route_count != null && (
+            <>
+              <p className="em-science-success">
+                {t(I18nKey.SCIENCE$ROUTE_COUNTS, {
+                  count: job.result.route_count,
+                  solved: job.result.solved_count,
+                })}
+              </p>
+              <p className="em-science-help">
+                {t(I18nKey.SCIENCE$ROUTE_RESULT_NOTE)}
+              </p>
+            </>
+          )}
+          {job.status === "succeeded" && job.result?.correction_factors && (
+            <>
+              <h3>{t(I18nKey.SCIENCE$CF_VALUES)}</h3>
+              {job.result.correction_factors.map((row, index) => (
+                <div
+                  key={`${index}-${row.smiles}`}
+                  className="em-science-energy"
+                >
+                  <span className="break-all">{row.smiles}</span>
+                  <strong>{row.cf.toFixed(6)}</strong>
+                </div>
+              ))}
+              <p className="em-science-help">
+                {t(I18nKey.SCIENCE$CF_RESULT_NOTE)}
+              </p>
+            </>
           )}
           <h3>{t(I18nKey.SCIENCE$LOG)}</h3>
           <textarea

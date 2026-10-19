@@ -324,6 +324,16 @@ async function http(
     redirect: "manual",
     signal: AbortSignal.timeout(timeout),
     headers: {
+      ...(existsSync(join(run.dir, "private", "http-auth.json"))
+        ? (() => {
+            const credentials = JSON.parse(
+              readFileSync(join(run.dir, "private", "http-auth.json"), "utf8"),
+            );
+            return {
+              Authorization: `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString("base64")}`,
+            };
+          })()
+        : {}),
       ...(auth ? { "X-Session-API-Key": sessionKey(run) } : {}),
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
       ...headers,
@@ -917,6 +927,7 @@ function spawnLauncher(run) {
 }
 
 async function stopLauncher(run) {
+  if (run.mode === "external") return { stopped: true, forced: false };
   const pgid = run.launcherPgid;
   let forced = false;
   const serviceGroups = new Set(
@@ -1051,6 +1062,11 @@ function descendants(rootPid) {
 async function cmdService({ positional, flags }) {
   const run = loadRun(flags);
   const [sub, name] = positional;
+  if (run.mode === "external")
+    throw new CliError(
+      "Attached deployments have no locally managed services",
+      { code: 2 },
+    );
   const procs = descendants(run.launcherPid);
   if (sub === "status") {
     const services = {};
@@ -1115,6 +1131,62 @@ async function cmdService({ positional, flags }) {
   );
 }
 
+async function cmdAttach({ flags }) {
+  if (!flags.url || !flags.run || !flags["session-key-file"])
+    usage(
+      "attach requires --url, --run and --session-key-file",
+      "control-openhands attach --help",
+    );
+  const url = new URL(flags.url);
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password
+  )
+    usage(
+      "Use an HTTP(S) URL without embedded credentials",
+      "control-openhands attach --help",
+    );
+  const dir = resolve(flags.run);
+  if (existsSync(join(dir, "run.json")))
+    throw new CliError("Run already exists; select it with --run", { code: 2 });
+  const key = readFileSync(resolve(flags["session-key-file"]), "utf8").trim();
+  if (!key) throw new CliError("Session key file is empty", { code: 2 });
+  let credentials;
+  if (flags["http-auth-file"]) {
+    credentials = JSON.parse(
+      readFileSync(resolve(flags["http-auth-file"]), "utf8"),
+    );
+    if (
+      typeof credentials.username !== "string" ||
+      typeof credentials.password !== "string"
+    )
+      throw new CliError("HTTP auth file requires username and password", {
+        code: 2,
+      });
+  }
+  mkdirSync(join(dir, "private"), { recursive: true, mode: 0o700 });
+  mkdirSync(join(dir, "evidence"), { recursive: true });
+  writeFileSync(join(dir, "private", "session-key"), key, { mode: 0o600 });
+  if (credentials)
+    writeFileSync(
+      join(dir, "private", "http-auth.json"),
+      JSON.stringify({ ...credentials, origin: url.origin }),
+      { mode: 0o600 },
+    );
+  const run = {
+    dir,
+    mode: "external",
+    baseUrl: url.origin,
+    uiPath: url.pathname,
+    ports: {},
+    startedAt: new Date().toISOString(),
+    revision: flags.revision || "external",
+  };
+  saveRun(run);
+  out({ ok: true, run: dir, baseUrl: run.baseUrl, mode: run.mode });
+}
+
 async function cmdStatus({ flags }) {
   const run = loadRun(flags);
   out({
@@ -1133,6 +1205,44 @@ async function cmdStatus({ flags }) {
 
 async function cmdDoctor({ flags }) {
   const run = loadRun(flags);
+  if (run.mode === "external") {
+    const checks = [];
+    for (const [path, auth, expected] of [
+      [run.uiPath, false, 200],
+      ["/server_info", true, 200],
+      ["/api/science/health", true, 200],
+      ["/api/science/health", false, 401],
+    ]) {
+      try {
+        const result = await http(run, "GET", path, { auth });
+        checks.push({
+          path,
+          auth,
+          ok: result.status === expected,
+          status: result.status,
+        });
+      } catch {
+        checks.push({ path, auth, ok: false });
+      }
+    }
+    if (!flags["skip-ui"]) {
+      try {
+        const probe = await browserCall(run, "uiprobe", {
+          target: run.uiPath,
+          timeout: 30000,
+        });
+        checks.push({
+          path: "UI",
+          ok: probe.pageErrors.length === 0 && probe.testids > 0,
+        });
+      } catch {
+        checks.push({ path: "UI", ok: false });
+      }
+    }
+    out({ ok: checks.every((row) => row.ok), checks, run: run.dir });
+    if (checks.some((row) => !row.ok)) process.exitCode = 3;
+    return;
+  }
   const checks = [];
   const add = (name, ok, detail, severity = "fail") =>
     checks.push({ name, ok, severity: ok ? "ok" : severity, detail });
@@ -4036,6 +4146,7 @@ states can be driven through the UI. Bring everything back with restart.
 Usage: control-openhands <command> [args] [--run <dir>]
 
 Lifecycle
+  attach        Attach a deployed stack for browser verification (no process control)
   launch        Build this checkout if needed, start an isolated stack + browser
   doctor        Read-only health check; run first and after any surprise
   status        Show the current run's ports, revision and liveness
@@ -4077,6 +4188,13 @@ Examples:
   control-openhands browser click 'testid=add-secret-button'
   control-openhands browser screenshot --feature F14.create --name form
   control-openhands stop
+`,
+  attach: `control-openhands attach --url https://host/canvas/science-apps --run DIR --session-key-file FILE [--http-auth-file FILE] [--revision SHA]
+
+Creates private browser/evidence state for an existing deployment, without launching
+or managing server processes. HTTP auth JSON contains username/password; credentials
+stay in private/ and are scoped to the attached origin. Start with browser start,
+then doctor. Use --run on every command. stop closes only the owned browser.
 `,
   launch: `control-openhands launch [--public] [--new] [--print-run] [--port N | --port-from N] [--build auto|always|never] [--min-free-mb 2000]
                          [--no-browser] [--timeout SEC] [--sdk-path DIR | --sdk-ref REF | --sdk-version V]
@@ -4332,6 +4450,7 @@ check also verifies every Source: path exists and the baseline line's shape.
 };
 
 const COMMANDS = {
+  attach: cmdAttach,
   launch: cmdLaunch,
   status: cmdStatus,
   doctor: cmdDoctor,

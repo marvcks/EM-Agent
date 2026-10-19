@@ -12,6 +12,47 @@ WATER = '3\nwater\nO 0 0 0\nH 0.7586 0 0.5043\nH -0.7586 0 0.5043\n'
 
 
 class ScienceTests(unittest.TestCase):
+    def test_reaction_inputs_use_smiles_and_bounded_search(self):
+        request = JobRequest(app_id='aizynthfinder', task='retrosynthesis', smiles='CC(=O)Oc1ccccc1C(=O)O')
+        name, content, args = prepare_input(request)
+        self.assertEqual(name, 'request.json')
+        self.assertEqual(__import__('json').loads(content)['smiles'], request.smiles)
+        self.assertEqual(args, ['request.json'])
+        for changes in [{'smiles': 'CCO; touch /tmp/x'}, {'smiles': 'CCO.O'},
+                        {'xyz': WATER}, {'task': 'energy'}, {'method': 'arbitrary'}]:
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                prepare_input(request.model_copy(update=changes))
+        with self.assertRaises(ValueError):
+            JobRequest(app_id='aizynthfinder', task='retrosynthesis', smiles='CCO', search_seconds=901)
+        cf = JobRequest(app_id='lcms2yield', task='correction_factor', smiles='c1ccccc1\nCC(=O)Oc1ccccc1C(=O)O')
+        self.assertEqual(prepare_input(cf)[0], 'request.json')
+
+    def test_reaction_success_requires_typed_verified_results(self):
+        async def exercise(root):
+            executable = root / 'fake-reaction'
+            manager = Manager(root / 'jobs')
+            cases = [
+                ('aizynthfinder', 'retrosynthesis', {'verified': True, 'app_id': 'aizynthfinder', 'route_count': 2, 'solved_count': 1}),
+                ('lcms2yield', 'correction_factor', {'verified': True, 'app_id': 'lcms2yield', 'correction_factors': [{'smiles': 'c1ccccc1', 'cf': 1.13}]}),
+            ]
+            for app_id, task, result in cases:
+                with patch('tools.science_apps.service.application_executable', return_value=str(executable)):
+                    executable.write_text('#!/bin/sh\necho EM_AGENT_REACTION_COMPLETE\n')
+                    executable.chmod(0o755)
+                    job = manager.submit(JobRequest(app_id=app_id, task=task, smiles='c1ccccc1'))
+                    await manager.run(job['id'])
+                    self.assertEqual(manager.detail(job['id'])['status'], 'failed')
+                    executable.write_text('#!/bin/sh\necho \'%s\' > result.json\necho EM_AGENT_REACTION_COMPLETE\n' % __import__('json').dumps(result))
+                    job = manager.submit(JobRequest(app_id=app_id, task=task, smiles='c1ccccc1'))
+                    await manager.run(job['id'])
+                    detail = manager.detail(job['id'])
+                    self.assertEqual(detail['status'], 'succeeded')
+                    self.assertIsNone(detail['energy_hartree'])
+                    self.assertEqual(detail['result'], result)
+                    self.assertNotIn('structure.xyz', [item['name'] for item in detail['files']])
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
+
     def test_magus_validates_molecular_search_before_queueing(self):
         request = JobRequest(app_id='magus', xyz=WATER, task='search', method='MACE-OFF23',
                              molecules_per_cell=4, generations=3, population_size=6,

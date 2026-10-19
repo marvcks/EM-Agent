@@ -99,6 +99,13 @@ const context = await chromium.launchPersistentContext(
     executablePath: executablePath || undefined,
     viewport: VIEWPORTS.desktop,
     acceptDownloads: true,
+    ...(existsSync(join(privateDir, "http-auth.json"))
+      ? {
+          httpCredentials: JSON.parse(
+            readFileSync(join(privateDir, "http-auth.json"), "utf8"),
+          ),
+        }
+      : {}),
     // Opt-in for sandboxes whose TLS interception presents leaf-only chains
     // that SPKI pins cannot match. Never set it in CI.
     ignoreHTTPSErrors:

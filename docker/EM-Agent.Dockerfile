@@ -20,6 +20,7 @@ LABEL org.opencontainers.image.source="https://github.com/marvcks/EM-Agent"
 LABEL org.opencontainers.image.revision="${SOURCE_COMMIT}"
 LABEL io.em-agent.upstream.revision="f07aebdf5cdd71f4a05ebcf30f8bef5e4e3b70b9"
 LABEL io.em-agent.magus="1"
+LABEL io.em-agent.reactions="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${SOURCE_COMMIT}
 USER root
@@ -31,5 +32,8 @@ COPY docker/entrypoint.sh /opt/agent-canvas/entrypoint.sh
 RUN chmod 755 /opt/agent-canvas/entrypoint.sh
 COPY tools/science_apps/ /opt/agent-canvas/science_apps/
 RUN install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magus-mace \
- && install -m 755 /opt/agent-canvas/science_apps/em-magus /usr/local/bin/em-magus
+ && install -m 755 /opt/agent-canvas/science_apps/em-magus /usr/local/bin/em-magus \
+ && install -m 755 /opt/agent-canvas/science_apps/aizynth-route /usr/local/bin/aizynth-route \
+ && install -m 755 /opt/agent-canvas/science_apps/lcms-cf /usr/local/bin/lcms-cf \
+ && install -m 755 /opt/agent-canvas/science_apps/em-reaction /usr/local/bin/em-reaction
 USER openhands

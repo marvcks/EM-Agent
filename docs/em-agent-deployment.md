@@ -148,3 +148,19 @@ docker exec openhands cat /opt/em-agent/release.json
 ```sh
 python3 -m unittest discover -s __tests__/scripts -p test_em_agent_deploy.py -v
 ```
+
+### 反应模型运行时
+
+带 `io.em-agent.reactions=1` 的镜像独立检查 AiZynthFinder / lcms2yield 的
+解释器、manifest 和必需模型，再添加三个同路径只读挂载：
+`/opt/em-agent-tools/python`、`/opt/em-agent-tools/aizynthfinder`、
+`/opt/em-agent-tools/lcms2yield`。该条件独立于 MAGUS 标签；既有软件挂载不变，
+回滚保留上一版本 Compose。Python 3.11 安装在这个容器可见前缀，避免 venv 的
+解释器链接指向宿主机 `/root`。权重、运行环境及安装器均不进入应用镜像。
+
+AiZynthFinder 使用官方源码 4.4.1 及 `download_public_data` 列出的 USPTO
+ONNX/模板和 ZINC stock；lcms2yield 使用官方源码及仓库内 `20250721.pth`。
+每个工具独立 uv 锁文件，CPU Torch 2.3.0 / PyG 2.5.3 / RDKit 2023.9.6
+按 lcms2yield 官方依赖准备；不升级 Agent Server 的 Python 包。
+实际来源提交、完整模型散列、锁文件、验收输入与日志保存在各工具管理目录，
+本地报告记录最终部署提交与镜像。

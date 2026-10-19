@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from .magus_runner import MODEL_DIR, RUNTIME_PYTHON, validate_search
+from .reaction_runner import REACTION_APPS, runtime_available, validate_request, verified_result
 
 PREFIX = '/api/science'
 MAX_LOG_BYTES = 10 * 1024 * 1024
@@ -34,11 +35,15 @@ APPLICATIONS = {
     'orca': {'name': 'ORCA', 'executable': 'orca', 'methods': ['r2SCAN-3c', 'HF', 'B3LYP'], 'bases': ['def2-SVP', 'def2-TZVP'], 'category': 'quantum'},
     'gaussian': {'name': 'Gaussian', 'executable': 'g16', 'methods': ['HF', 'B3LYP', 'PBE1PBE'], 'bases': ['STO-3G', '6-31G(d)', 'def2SVP'], 'category': 'quantum'},
     'magus': {'name': 'MAGUS', 'executable': 'magus-mace', 'methods': ['MACE-OFF23'], 'bases': [], 'category': 'crystal'},
+    'aizynthfinder': {'name': 'AiZynthFinder', 'executable': 'aizynth-route', 'methods': ['USPTO'], 'bases': [], 'category': 'reaction'},
+    'lcms2yield': {'name': 'lcms2yield', 'executable': 'lcms-cf', 'methods': ['UV-CF 20250721'], 'bases': [], 'category': 'reaction'},
 }
 
 
 def application_executable(app_id):
     executable = shutil.which(APPLICATIONS[app_id]['executable'])
+    if app_id in REACTION_APPS and not runtime_available(app_id):
+        return None
     if app_id == 'magus' and (not os.access(RUNTIME_PYTHON, os.X_OK) or
             not all((MODEL_DIR / f'MACE-OFF23_{size}.model').is_file() for size in ('small', 'medium', 'large'))):
         return None
@@ -47,10 +52,11 @@ def application_executable(app_id):
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['xtb', 'orca', 'gaussian', 'magus']
-    xyz: str = Field(min_length=5, max_length=65536)
+    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield']
+    xyz: str = Field(default='', max_length=65536)
+    smiles: str = Field(default='', max_length=32768)
     title: str = Field(default='', max_length=80)
-    task: Literal['energy', 'optimize', 'search'] = 'energy'
+    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor'] = 'energy'
     method: str = ''
     basis: str = ''
     charge: int = Field(default=0, ge=-10, le=10)
@@ -63,6 +69,10 @@ class JobRequest(BaseModel):
     generations: int = Field(default=3, ge=1, le=10)
     volume_min: float = Field(default=180.0, ge=30, le=20000, allow_inf_nan=False)
     volume_max: float = Field(default=400.0, ge=30, le=20000, allow_inf_nan=False)
+    iterations: int = Field(default=100, ge=1, le=500)
+    search_seconds: int = Field(default=60, ge=1, le=600)
+    max_transforms: int = Field(default=6, ge=1, le=10)
+    max_routes: int = Field(default=10, ge=1, le=25)
 
 
 def now():
@@ -101,6 +111,11 @@ def prepare_input(request):
     method = request.method or config['methods'][0]
     basis = request.basis or (config['bases'][0] if config['bases'] else '')
     if method not in config['methods'] or (basis and basis not in config['bases']):
+        raise ValueError('invalid_method')
+    if request.app_id in REACTION_APPS:
+        validate_request(request)
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
+    if request.smiles or request.task not in {'energy', 'optimize', 'search'}:
         raise ValueError('invalid_method')
     atoms = parse_xyz(request.xyz, request.charge, request.multiplicity)
     if request.app_id == 'magus':
@@ -170,7 +185,8 @@ class Manager:
         directory = self.directory(job_id)
         directory.mkdir(mode=0o700)
         (directory / name).write_text(content)
-        (directory / 'structure.xyz').write_text(request.xyz)
+        if request.xyz:
+            (directory / 'structure.xyz').write_text(request.xyz)
         job = {'id': job_id, 'app_id': request.app_id, 'title': request.title.strip() or APPLICATIONS[request.app_id]['name'],
                'status': 'queued', 'created_at': now(), 'started_at': None, 'finished_at': None,
                'error': None, 'energy_hartree': None, 'energy_ev': None, 'exit_code': None, 'request': request.model_dump()}
@@ -279,7 +295,8 @@ class Manager:
                         continue
                 job['exit_code'] = await self.process.wait()
             text = log_path.read_text(errors='replace')
-            markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE'}
+            markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE',
+                       'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE'}
             if job['status'] != 'cancelled':
                 success = job['exit_code'] == 0 and markers[job['app_id']].lower() in text.lower() and not job['error']
                 if success and job['app_id'] == 'magus':
@@ -289,12 +306,17 @@ class Manager:
                                and math.isfinite(result.get('energy_eV', float('nan'))))
                     if success:
                         job['energy_ev'] = result['energy_eV']
+                if success and job['app_id'] in REACTION_APPS:
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = verified_result(result, job['app_id'], len(request.smiles.strip().splitlines()))
+                    if success:
+                        job['result'] = result
                 job['status'] = 'succeeded' if success else 'failed'
                 if not success and not job['error']:
                     job['error'] = 'calculation_failed'
                 patterns = {'xtb': r'TOTAL ENERGY\s+(-?[\d.]+)', 'orca': r'FINAL SINGLE POINT ENERGY\s+(-?[\d.]+)',
                             'gaussian': r'SCF Done:.*?=\s*(-?[\d.]+)'}
-                energies = re.findall(patterns[job['app_id']], text) if job['app_id'] != 'magus' else []
+                energies = re.findall(patterns[job['app_id']], text) if job['app_id'] in patterns else []
                 if success and energies:
                     job['energy_hartree'] = float(energies[-1])
         except Exception:

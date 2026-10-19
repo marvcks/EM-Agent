@@ -9,7 +9,17 @@ export const SCIENCE_EXAMPLE_XYZ =
   "3\nWater\nO 0 0 0\nH 0.7586 0 0.5043\nH -0.7586 0 0.5043\n";
 export const SCIENCE_MAGUS_EXAMPLE_XYZ =
   "5\nMethane\nC 0 0 0\nH 0.63 0.63 0.63\nH -0.63 -0.63 0.63\nH -0.63 0.63 -0.63\nH 0.63 -0.63 -0.63\n";
-export const SCIENCE_APP_IDS = ["xtb", "orca", "gaussian", "magus"] as const;
+export const SCIENCE_APP_IDS = [
+  "xtb",
+  "orca",
+  "gaussian",
+  "magus",
+  "aizynthfinder",
+  "lcms2yield",
+] as const;
+export const SCIENCE_ROUTE_EXAMPLE = "CC(=O)Oc1ccccc1C(=O)O";
+export const SCIENCE_CF_EXAMPLE =
+  "CN(N=C1)C=C1CC2(CC(F)(F)C2)NC(CC3=CC(C=C(Br)C=N4)=C4C=C3)C5=C(O)C=CC=N5";
 export type ScienceAppId = (typeof SCIENCE_APP_IDS)[number];
 export type ScienceJobStatus =
   | "queued"
@@ -20,7 +30,7 @@ export type ScienceJobStatus =
 export interface ScienceApplication {
   id: ScienceAppId;
   name: string;
-  category: "semiempirical" | "quantum" | "crystal";
+  category: "semiempirical" | "quantum" | "crystal" | "reaction";
   available: boolean;
   methods: string[];
   bases: string[];
@@ -31,8 +41,14 @@ export interface ScienceApplication {
 export interface ScienceJobRequest {
   app_id: ScienceAppId;
   xyz: string;
+  smiles?: string;
   title: string;
-  task: "energy" | "optimize" | "search";
+  task:
+    | "energy"
+    | "optimize"
+    | "search"
+    | "retrosynthesis"
+    | "correction_factor";
   method: string;
   basis: string;
   charge: number;
@@ -45,6 +61,10 @@ export interface ScienceJobRequest {
   generations?: number;
   volume_min?: number;
   volume_max?: number;
+  iterations?: number;
+  search_seconds?: number;
+  max_transforms?: number;
+  max_routes?: number;
 }
 export interface ScienceJob {
   id: string;
@@ -57,6 +77,11 @@ export interface ScienceJob {
   error: string | null;
   energy_hartree: number | null;
   energy_ev?: number | null;
+  result?: {
+    route_count?: number;
+    solved_count?: number;
+    correction_factors?: { smiles: string; cf: number }[];
+  };
   exit_code: number | null;
 }
 export interface ScienceJobDetail extends ScienceJob {

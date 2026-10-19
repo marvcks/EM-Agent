@@ -223,3 +223,16 @@ prerequisite; never substitute a mock and call it a pass.
 
 See [references/adaptation.md](references/adaptation.md) for where these ideas
 come from and what was deliberately left out.
+
+## Existing EM-Agent deployment
+
+For a deployed stack, use `control-openhands attach --url URL --run DIR
+--session-key-file FILE --http-auth-file FILE --revision SHA`, then `browser start`
+and `doctor`, always passing `--run DIR`. The optional HTTP auth file is JSON with
+`username` / `password`; obtain it from the existing private credential store,
+never paste values in commands or evidence. Attach copies credentials into
+`private/` with mode 600, scopes browser HTTP auth to this origin, and manages no
+server processes. `stop` closes only its browser. The external doctor checks the
+UI, Agent Server, authenticated science health and rejection without a session
+key; it does not make claims about remote process ownership. All normal UI
+verbs, downloads and evidence commands then apply to the live deployment.

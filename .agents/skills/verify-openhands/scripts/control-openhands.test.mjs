@@ -1844,3 +1844,39 @@ test.skipIf(process.platform === "win32")(
     }
   },
 );
+
+test("attach keeps credentials private and never owns deployed processes", () => {
+  const dir = mkdtempSync(join(tmpdir(), "oh-attach-test-"));
+  const key = join(dir, "key");
+  const auth = join(dir, "auth.json");
+  writeFileSync(key, "test-session-private");
+  writeFileSync(
+    auth,
+    JSON.stringify({ username: "user", password: "test-password-private" }),
+  );
+  const attached = join(dir, "run");
+  const result = run([
+    "attach",
+    "--url",
+    "https://example.test/canvas/science-apps",
+    "--run",
+    attached,
+    "--session-key-file",
+    key,
+    "--http-auth-file",
+    auth,
+  ]);
+  assert.equal(result.status, 0);
+  assert.ok(!result.stdout.includes("test-password-private"));
+  const metadata = JSON.parse(readFileSync(join(attached, "run.json"), "utf8"));
+  assert.equal(metadata.mode, "external");
+  assert.equal(metadata.launcherPid, undefined);
+  assert.ok(!JSON.stringify(metadata).includes("test-session-private"));
+  assert.equal(
+    JSON.parse(readFileSync(join(attached, "private/http-auth.json"), "utf8"))
+      .origin,
+    "https://example.test",
+  );
+  const stopped = run(["stop", "--run", attached]);
+  assert.equal(stopped.status, 0);
+});

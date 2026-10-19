@@ -23,6 +23,17 @@ vi.mock("#/api/science-apps-service", async (importOriginal) => ({
   },
 }));
 const applications: ScienceApplication[] = [
+  ...(["aizynthfinder", "lcms2yield"] as const).map((id) => ({
+    id,
+    name: id,
+    category: "reaction" as const,
+    available: true,
+    methods: [id === "aizynthfinder" ? "USPTO" : "UV-CF 20250721"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  })),
   {
     id: "magus",
     name: "MAGUS",
@@ -98,6 +109,54 @@ beforeEach(() => {
 });
 
 describe("manual scientific applications", () => {
+  it.each(["aizynthfinder", "lcms2yield"] as const)(
+    "submits %s SMILES with its own task and shows typed results",
+    async (appId) => {
+      const user = userEvent.setup();
+      vi.mocked(scienceAppsService.job).mockResolvedValue({
+        ...job,
+        app_id: appId,
+        status: "succeeded",
+        result:
+          appId === "aizynthfinder"
+            ? { route_count: 2, solved_count: 1 }
+            : { correction_factors: [{ smiles: "c1ccccc1", cf: 1.1300693 }] },
+      });
+      renderWithProviders(
+        <ScienceAppsPage appId={appId} jobId="abc" onSelectJob={vi.fn()} />,
+      );
+      await screen.findByTestId("science-submit");
+      expect(screen.queryByLabelText("SCIENCE$CHARGE")).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("SCIENCE$UPLOAD_XYZ"),
+      ).not.toBeInTheDocument();
+      await user.click(
+        screen.getByRole("button", { name: "SCIENCE$SMILES_EXAMPLE" }),
+      );
+      await user.click(screen.getByTestId("science-submit"));
+      await waitFor(() =>
+        expect(scienceAppsService.submit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            app_id: appId,
+            task:
+              appId === "aizynthfinder"
+                ? "retrosynthesis"
+                : "correction_factor",
+            xyz: "",
+            smiles: expect.any(String),
+          }),
+          expect.anything(),
+        ),
+      );
+      if (appId === "lcms2yield") {
+        expect(screen.getByText("1.130069")).toBeInTheDocument();
+        expect(screen.getByText("SCIENCE$CF_RESULT_NOTE")).toBeInTheDocument();
+      } else {
+        expect(screen.getByText("SCIENCE$ROUTE_COUNTS")).toBeInTheDocument();
+      }
+    },
+  );
+
   it("submits a bounded molecular crystal search and shows energies in eV", async () => {
     const user = userEvent.setup();
     vi.mocked(scienceAppsService.job).mockResolvedValue({

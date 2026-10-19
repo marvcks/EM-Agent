@@ -24,7 +24,7 @@ Maintenance baseline: main@553d4519113192a80fb18376fdb6c1e39fa06387 (2026-10-09)
   recipe that reads a model reply is `blocked`, never a pass.
 - The browser is at the desktop viewport (1440×1000) unless a recipe says
   otherwise; `control-openhands browser viewport phone` is 390×844.
-- Never drive an instance that this verification run did not start.
+- Drive only the isolated instance this run started, or an existing deployment explicitly selected with `control-openhands attach` and private credential files.
 
 ## Driving conventions
 
@@ -256,8 +256,9 @@ How to write and prove new entries: [../mapping.md](../mapping.md).
 | F25 | [Backends, Cloud and sharing](F25-backends-and-cloud.md) | add, edit, remove and switch backends, per-backend consent, Cloud login, shared pages | backend selector | a second stack; Cloud account (blocked) | 29 |
 | F26 | [Launcher modes, Docker, desktop and library](F26-runtime-variants.md) | launcher flags, partial stacks, LAN bind, Docker, Electron, embeddable library | a terminal | Docker/Electron where available | 32 |
 | F27 | [Workspace tools](F27-workspace-tools.md) | terminal, browser, planner, task list, usage, `canvas_ui_control` | drawer tabs | LLM | 30 |
+| F28 | [EM-Agent scientific applications](F28-science-apps.md) | reaction SMILES, native models, queue, stop, downloads, history | `/science-apps/:appId?` | deployed science runtimes/models | 7 |
 
-27 families, 747 sub-features. `control-openhands map ids` lists every ID with its file.
+28 families, 754 sub-features. `control-openhands map ids` lists every ID with its file.
 
 ### Neighbouring families
 

@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Run public reaction models through the shared EM-Agent science queue."""
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+
+def api(path, payload=None):
+    key = os.environ.get('LOCAL_BACKEND_API_KEY') or os.environ.get('OH_SESSION_API_KEYS_0')
+    if not key:
+        raise RuntimeError('Runtime session key is unavailable')
+    request = urllib.request.Request('http://127.0.0.1:8000/api/science' + path,
+        data=json.dumps(payload).encode() if payload is not None else None,
+        headers={'X-Session-API-Key': key, 'Content-Type': 'application/json'})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return response.read()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest='command', required=True)
+    submit = commands.add_parser('submit', help='Submit connected molecular SMILES, one per line')
+    submit.add_argument('app_id', choices=['aizynthfinder', 'lcms2yield'])
+    submit.add_argument('smiles_file', type=Path)
+    submit.add_argument('--title', default='')
+    submit.add_argument('--iterations', type=int, default=100)
+    submit.add_argument('--search-seconds', type=int, default=60)
+    submit.add_argument('--max-transforms', type=int, default=6)
+    submit.add_argument('--max-routes', type=int, default=10)
+    submit.add_argument('--cores', type=int, default=2)
+    submit.add_argument('--memory-mb', type=int, default=2048)
+    commands.add_parser('apps')
+    commands.add_parser('jobs')
+    for name in ['status', 'cancel', 'download']:
+        command = commands.add_parser(name)
+        command.add_argument('job_id')
+        if name == 'download':
+            command.add_argument('directory', type=Path)
+    args = parser.parse_args()
+    if args.command == 'submit':
+        payload = vars(args).copy()
+        payload.pop('command')
+        source = payload.pop('smiles_file')
+        if source.stat().st_size > 32768:
+            raise ValueError('SMILES input exceeds 32 KiB')
+        payload.update(task='retrosynthesis' if args.app_id == 'aizynthfinder' else 'correction_factor', smiles=source.read_text())
+        result = api('/jobs', payload)
+    elif args.command in {'apps', 'jobs'}:
+        result = api('/' + args.command)
+    else:
+        path = '/jobs/' + urllib.parse.quote(args.job_id, safe='')
+        if args.command == 'cancel':
+            result = api(path + '/cancel', {})
+        else:
+            result = api(path)
+            if args.command == 'download':
+                job = json.loads(result)
+                args.directory.mkdir(parents=True, exist_ok=True)
+                saved = []
+                for entry in job['files']:
+                    name = entry['name']
+                    destination = args.directory / name
+                    if Path(name).name != name or destination.exists() or destination.is_symlink():
+                        raise ValueError('Unsafe or existing download target: ' + name)
+                    with destination.open('xb') as stream:
+                        stream.write(api(path + '/files/' + urllib.parse.quote(name, safe='')))
+                    saved.append(str(destination))
+                result = json.dumps({'saved': saved}).encode()
+    print(json.dumps(json.loads(result), ensure_ascii=False, indent=2))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except urllib.error.HTTPError as exc:
+        print(f'Science API HTTP {exc.code}: {exc.read().decode()}', file=sys.stderr)
+        sys.exit(1)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)

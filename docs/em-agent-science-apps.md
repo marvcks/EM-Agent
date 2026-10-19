@@ -76,3 +76,38 @@ npx vitest run __tests__/components/features/science-apps/science-apps-page.test
 - 火山容器运行用户真实水分子单点验证：xTB GFN2-xTB、ORCA HF/def2-SVP、Gaussian HF/STO-3G 均正常结束；对应能量约 -5.06577462、-75.95751551、-74.94588512 Eh。方法不同，数值仅作为各自连通性检查，不能跨方法比较。
 - 前端及相关导航/MCP/镜像路由回归 117 项通过；科学服务生命周期/校验/鉴权/下载/并行参数 6 项、部署脚本 6 项通过。类型、翻译完整性和生产构建通过。
 - 本机 macOS Bash 3.2 对 `set -u` 下的空数组报错，上游 `docker-session-key-policy` 两项本机测试原本会失败；未改变该策略。在火山 Linux Bash 中执行原策略块，默认/禁用/开启三种情况通过。
+
+## AiZynthFinder 与 lcms2yield
+
+反应模型使用独立的 SMILES 表单（`.smi` / `.txt`，32 KiB），不使用 XYZ。
+两个入口共用原有串行队列、15 分钟上限、停止、历史与文件下载。
+无效分子的化学解析在隔离 runner 中进行，在模型加载前失败并保留日志。
+请求包含氢的原子总数最多 128，不接受多组分盐或反应 SMILES。
+
+- **AiZynthFinder 4.4.1**：一个目标分子；公开 USPTO ONNX 扩展/过滤模型及
+  ZINC 原料库。迭代 1–500、搜索 1–600 秒、深度 1–10、返回最多 25 条路线。
+  搜索时限不包括模型加载，总任务仍受 900 秒限制。`routes.json` 保存路线树，
+  `routes.txt` 保存逆合成步骤和原料；`result.json` 区分返回路线数与原料库闭合数。
+  闭合仅表示原料在这个公开库中，不等于实验验证或实时可采购。零闭合路线也可能
+  是正常完成的搜索，不能把任务成功解释为一定找到可执行路线。
+- **lcms2yield**：每行一个分子，最多 16 个，官方 `20250721.pth` CPU 推理。
+  支持 C/N/O/S/F/P/Cl/Br/B/H/I/Si，输出 `correction_factors.csv` 与 `result.json`。
+  模型输出是全光谱 UV 校正因子 **CF，不是产率或百分比**。产率定量还需实验
+  LC-MS/UV 测量和匹配的校准协议；本入口不接受原始仪器文件或猜测校准公式。
+
+```sh
+em-reaction submit aizynthfinder target.smi --search-seconds 60 --iterations 100 --cores 2
+em-reaction submit lcms2yield products.smi --cores 2
+em-reaction status JOB_ID
+em-reaction cancel JOB_ID
+em-reaction download JOB_ID ./reaction-results
+```
+
+独立运行时位于 `/opt/em-agent-tools/{aizynthfinder,lcms2yield}`；共享解释器在
+`/opt/em-agent-tools/python`。各工具有 `pyproject.toml`、`uv.lock`、`.venv`、
+固定来源的 `source` 和包含版本/模型散列的 `manifest.json`。可用性要求解释器、
+程序、模型及 manifest 都存在，不在刷新目录或提交时联网下载。各 runner 限制
+CPU affinity，沿用申请内存语义。服务器管理记录在 `/root/EM-Agent-Tools/<tool>`。
+镜像自带 `aizynthfinder` / `lcms2yield` 用户技能，无同名技能时链接到持久化技能目录；
+已有对话需新建才能加载。Agent CLI 真正调用共用 API；这不等同于已验收 LLM 的
+自然语言规划行为。

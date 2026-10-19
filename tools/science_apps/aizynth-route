@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /opt/em-agent-tools/aizynthfinder/.venv/bin/python -I /opt/agent-canvas/science_apps/reaction_runner.py "$@"
