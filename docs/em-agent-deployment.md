@@ -164,3 +164,8 @@ ONNX/模板和 ZINC stock；lcms2yield 使用官方源码及仓库内 `20250721.
 按 lcms2yield 官方依赖准备；不升级 Agent Server 的 Python 包。
 实际来源提交、完整模型散列、锁文件、验收输入与日志保存在各工具管理目录，
 本地报告记录最终部署提交与镜像。
+
+AiZynthFinder 4.4.1 要求 NumPy <2；当前 PyArrow 26 wheel 运行时要求 NumPy 2，
+其依赖元数据未阻止解析出不兼容组合。该独立环境固定 `pyarrow==20.0.0`，
+通过完整路线搜索和依赖检查；不要直接更新为最新 PyArrow。阿司匹林测试的
+峰值 RSS 约 5.1 GiB，页面和 CLI 默认申请 6144 MB，仍非 OS 硬隔离。

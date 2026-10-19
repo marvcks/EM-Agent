@@ -33,7 +33,7 @@ def main():
     submit.add_argument('--max-transforms', type=int, default=6)
     submit.add_argument('--max-routes', type=int, default=10)
     submit.add_argument('--cores', type=int, default=2)
-    submit.add_argument('--memory-mb', type=int, default=2048)
+    submit.add_argument('--memory-mb', type=int)
     commands.add_parser('apps')
     commands.add_parser('jobs')
     for name in ['status', 'cancel', 'download']:
@@ -45,6 +45,8 @@ def main():
     if args.command == 'submit':
         payload = vars(args).copy()
         payload.pop('command')
+        if payload['memory_mb'] is None:
+            payload['memory_mb'] = 6144 if args.app_id == 'aizynthfinder' else 2048
         source = payload.pop('smiles_file')
         if source.stat().st_size > 32768:
             raise ValueError('SMILES input exceeds 32 KiB')

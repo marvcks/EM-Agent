@@ -58,7 +58,7 @@ export function ReactionForm({
     charge: 0,
     multiplicity: 1,
     cores: 2,
-    memory_mb: 2048,
+    memory_mb: isRoute ? 6144 : 2048,
     ...(isRoute
       ? {
           iterations: 100,
