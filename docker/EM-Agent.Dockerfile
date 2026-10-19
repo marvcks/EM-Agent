@@ -27,5 +27,6 @@ COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
 COPY --from=frontend-build /build/release.json /opt/em-agent/release.json
 ENV EM_AGENT_SCIENCE_APPS=1
 COPY docker/entrypoint.sh /opt/agent-canvas/entrypoint.sh
+RUN chmod 755 /opt/agent-canvas/entrypoint.sh
 COPY tools/science_apps/service.py /opt/agent-canvas/science_apps/service.py
 USER openhands

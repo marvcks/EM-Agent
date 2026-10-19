@@ -13,4 +13,6 @@ git -C "$repo_root" archive "$source_commit" |
   docker build --file docker/EM-Agent.Dockerfile \
     --build-arg "SOURCE_COMMIT=$source_commit" \
     --tag "$image_tag" -
+# Validate files as the final runtime user before this image can be deployed.
+docker run --rm --entrypoint /bin/sh "$image_tag" -c 'test -x /opt/agent-canvas/entrypoint.sh && python -c "import sys; sys.path.insert(0, \"/opt/agent-canvas\"); import science_apps.service, fastapi, uvicorn"'
 docker image inspect "$image_tag" --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
