@@ -29,9 +29,11 @@ import {
   type ScienceJobStatus,
 } from "#/api/science-apps-service";
 
+import { BDEForm, BDEResult } from "./bde-form";
 import { ReactionForm } from "./reaction-form";
 
 const DESCRIPTION_KEYS = {
+  bde: I18nKey.SCIENCE$BDE_DESCRIPTION,
   xtb: I18nKey.SCIENCE$XTB_DESCRIPTION,
   orca: I18nKey.SCIENCE$ORCA_DESCRIPTION,
   gaussian: I18nKey.SCIENCE$GAUSSIAN_DESCRIPTION,
@@ -47,6 +49,7 @@ const STATUS_KEYS: Record<ScienceJobStatus, I18nKey> = {
   cancelled: I18nKey.SCIENCE$CANCELLED,
 };
 const ERROR_KEYS: Record<string, I18nKey> = {
+  invalid_bde_input: I18nKey.SCIENCE$BDE_INPUT_ERROR,
   invalid_smiles: I18nKey.SCIENCE$INVALID_SMILES,
   invalid_reaction_input: I18nKey.SCIENCE$INVALID_SMILES,
   invalid_method: I18nKey.SCIENCE$INVALID_SMILES,
@@ -61,6 +64,7 @@ const ERROR_KEYS: Record<string, I18nKey> = {
   invalid_volume: I18nKey.SCIENCE$VOLUME_ERROR,
 };
 const CATEGORY_KEYS = {
+  bond: I18nKey.SCIENCE$BDE_CATEGORY,
   all: I18nKey.SCIENCE$ALL,
   quantum: I18nKey.SCIENCE$QUANTUM,
   semiempirical: I18nKey.SCIENCE$SEMIEMPIRICAL,
@@ -69,6 +73,7 @@ const CATEGORY_KEYS = {
 };
 const SCIENCE_CATEGORIES = [
   "all",
+  "bond",
   "quantum",
   "semiempirical",
   "crystal",
@@ -225,7 +230,13 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
               </span>
             </div>
             <div className="em-science-workbench">
-              {selected.category === "reaction" ? (
+              {selected.id === "bde" ? (
+                <BDEForm
+                  app={selected}
+                  onCreated={onSelectJob}
+                  renderError={(error) => <ErrorMessage error={error} />}
+                />
+              ) : selected.category === "reaction" ? (
                 <ReactionForm
                   key={selected.id}
                   app={selected}
@@ -824,6 +835,9 @@ function JobResult({ jobId }: { jobId: string | null }) {
                 {t(I18nKey.SCIENCE$CF_RESULT_NOTE)}
               </p>
             </>
+          )}
+          {job.app_id === "bde" && job.status === "succeeded" && job.result && (
+            <BDEResult result={job.result} />
           )}
           <h3>{t(I18nKey.SCIENCE$LOG)}</h3>
           <textarea

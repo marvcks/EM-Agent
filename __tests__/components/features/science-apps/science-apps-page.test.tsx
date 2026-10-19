@@ -23,6 +23,17 @@ vi.mock("#/api/science-apps-service", async (importOriginal) => ({
   },
 }));
 const applications: ScienceApplication[] = [
+  {
+    id: "bde",
+    name: "BDE",
+    category: "bond",
+    available: true,
+    methods: ["ALFABET", "Psi4"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  },
   ...(["aizynthfinder", "lcms2yield"] as const).map((id) => ({
     id,
     name: id,
@@ -109,6 +120,66 @@ beforeEach(() => {
 });
 
 describe("manual scientific applications", () => {
+  // @spec BDE-004 — Render and submit the real BDE contract
+  it("submits names in Psi4 mode and displays numbered bond values and graph", async () => {
+    const user = userEvent.setup();
+    vi.mocked(scienceAppsService.job).mockResolvedValue({
+      ...job,
+      app_id: "bde",
+      status: "succeeded",
+      result: {
+        mode: "Psi4",
+        canonical_smiles: "O",
+        diagram_png_base64: "cG5n",
+        minimum_bond_index: 0,
+        minimum_bde_kcal_mol: 119.5,
+        bonds: [
+          {
+            bond_index: 0,
+            atom1: 0,
+            atom2: 1,
+            bond_type: "O-H",
+            status: "ok",
+            reason: "",
+            bde_kcal_mol: 119.5,
+            fragments: ["[OH]", "[H]"],
+          },
+        ],
+      },
+    });
+    renderWithProviders(
+      <ScienceAppsPage appId="bde" jobId="abc" onSelectJob={vi.fn()} />,
+    );
+    await screen.findByTestId("science-submit");
+    await user.selectOptions(screen.getByLabelText("SCIENCE$BDE_MODE"), "Psi4");
+    await user.selectOptions(
+      screen.getByLabelText("SCIENCE$BDE_INPUT_KIND"),
+      "name",
+    );
+    await user.type(screen.getByLabelText("SCIENCE$BDE_NAME"), "water");
+    await user.click(screen.getByTestId("science-submit"));
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          app_id: "bde",
+          task: "bde",
+          method: "Psi4",
+          input_kind: "name",
+          compound_name: "water",
+          smiles: "",
+          xyz: "",
+        }),
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByAltText("SCIENCE$BDE_GRAPH")).toHaveAttribute(
+      "src",
+      "data:image/png;base64,cG5n",
+    );
+    expect(screen.getByRole("table")).toHaveTextContent("119.50");
+    expect(screen.getByText("SCIENCE$BDE_MINIMUM")).toBeInTheDocument();
+  });
+
   it.each(["aizynthfinder", "lcms2yield"] as const)(
     "submits %s SMILES with its own task and shows typed results",
     async (appId) => {

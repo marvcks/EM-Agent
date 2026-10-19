@@ -16,6 +16,7 @@ export const SCIENCE_APP_IDS = [
   "magus",
   "aizynthfinder",
   "lcms2yield",
+  "bde",
 ] as const;
 export const SCIENCE_ROUTE_EXAMPLE = "CC(=O)Oc1ccccc1C(=O)O";
 export const SCIENCE_CF_EXAMPLE =
@@ -30,7 +31,7 @@ export type ScienceJobStatus =
 export interface ScienceApplication {
   id: ScienceAppId;
   name: string;
-  category: "semiempirical" | "quantum" | "crystal" | "reaction";
+  category: "semiempirical" | "quantum" | "crystal" | "reaction" | "bond";
   available: boolean;
   methods: string[];
   bases: string[];
@@ -42,13 +43,16 @@ export interface ScienceJobRequest {
   app_id: ScienceAppId;
   xyz: string;
   smiles?: string;
+  input_kind?: "smiles" | "name";
+  compound_name?: string;
   title: string;
   task:
     | "energy"
     | "optimize"
     | "search"
     | "retrosynthesis"
-    | "correction_factor";
+    | "correction_factor"
+    | "bde";
   method: string;
   basis: string;
   charge: number;
@@ -78,6 +82,21 @@ export interface ScienceJob {
   energy_hartree: number | null;
   energy_ev?: number | null;
   result?: {
+    mode?: "ALFABET" | "Psi4";
+    canonical_smiles?: string;
+    diagram_png_base64?: string;
+    minimum_bond_index?: number;
+    minimum_bde_kcal_mol?: number;
+    bonds?: {
+      bond_index: number;
+      atom1: number;
+      atom2: number;
+      bond_type: string;
+      status: "ok" | "unsupported";
+      reason: string;
+      bde_kcal_mol: number | null;
+      fragments: string[];
+    }[];
     route_count?: number;
     solved_count?: number;
     correction_factors?: { smiles: string; cf: number }[];

@@ -1,0 +1,6 @@
+#!/bin/sh
+case "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["method"])' "$1")" in
+  Psi4) exec /opt/em-agent-tools/bde/psi4/bin/python -I /opt/agent-canvas/science_apps/bde_runner.py "$@" ;;
+  ALFABET) exec /opt/em-agent-tools/bde/.venv/bin/python -I /opt/agent-canvas/science_apps/bde_runner.py "$@" ;;
+  *) exit 2 ;;
+esac

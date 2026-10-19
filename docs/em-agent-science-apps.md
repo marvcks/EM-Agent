@@ -116,3 +116,39 @@ CPU affinity，沿用申请内存语义。服务器管理记录在 `/root/EM-Age
 持久化任务路径下；PyTorch 多进程使用 Unix socket，长 TMPDIR 会触发
 `AF_UNIX path too long` 并使上游加载器等待。成功、失败、停止和超时均由
 Manager 的 finally 清理这个短临时目录，持久化输入/日志/结果路径保持原样。
+
+## 化学键 BDE 解析
+
+入口 **科学应用 → BDE**。输入单个 SMILES 或标准名（联网通过 PubChem 解析，结果需核对
+canonical SMILES 和分子图）。支持中性闭壳层、无同位素 C/H/N/O 分子，含氢最多 128 原子。
+先规范化 SMILES，再加显式氢和编号；遍历全部键，对非环单键（含 X–H）生成两个双重态
+自由基。环键、双/三键显示“不支持”，不生成虚构数值。最低 BDE 仅在支持键中比较。
+
+- **ALFABET**：官方 v0.1.1 TensorFlow 2 权重与原始特征编码，参考 M06-2X/def2-TZVP；
+  是论文后的模型更新版，不宣称逐字复现 2020 原始权重。未知原子/键特征词汇拒绝预测。
+- **Psi4**：M06-2X/6-311+G(d,p)，即用户要求的 6-311+G**；母体和自由基分别优化，频率
+  提供 ZPE 和 298.15 K、1 atm 热焓修正，按 H(A·)+H(B·)−H(AB) 计算 kcal/mol。
+  原子无振动自由度，使用 E+5RT/2。母体从 12 个 ETKDG/MMFF94s 构象选最低者，自由基
+  从母体断键构型开始；不是全局构象穷尽。检查优化收敛、明显虚频（>20i cm⁻¹）与连接关系。
+  与代理模型的基组不同，两者不能当作同一计算协议的逐键复现。
+
+共用串行队列、8 核/8192 MB 申请、900 秒全任务时限。Psi4 遍历较大分子可能超时，建议
+从水、甲烷等小分子开始；未完成不发布成功结果或全分子最低 BDE。可下载 `molecule.png`、
+`bonds.csv`、`result.json`、`results.zip`，量化模式另有初始/优化 XYZ、频率和焓记录。
+分子图/表/CSV 的原子、键编号均从 0 开始。`parent-initial.xyz` 与 ZIP 中的
+`generated-fragments/` 提供生成坐标，`fragment-structures.json` 记录逐键映射；这些初始
+坐标不标为量化优化结果。Psi4 的 `structures/*/optimized.xyz` 才是通过检查的优化结构。
+
+Agent 新对话发现 `bde` 使用技能，CLI 与页面共用服务：
+
+```sh
+em-bde submit --smiles 'CCO' --mode ALFABET --cores 2
+em-bde submit --name 'water' --mode Psi4 --cores 4 --memory-mb 4096
+em-bde status JOB_ID
+em-bde cancel JOB_ID
+em-bde download JOB_ID ./bde-results
+```
+
+参考论文：https://www.nature.com/articles/s41467-020-16201-z 。
+用户提供的正文、SI PDF 和自由基 XYZ 用于协议核对；本地 MOESM2 DOCX 内容与论文不符，
+不参与计算或模型构建。权重、环境、安装器及论文附件均不进入应用镜像。

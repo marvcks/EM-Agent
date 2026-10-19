@@ -26,12 +26,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from .magus_runner import MODEL_DIR, RUNTIME_PYTHON, validate_search
 from .reaction_runner import REACTION_APPS, runtime_available, validate_request, verified_result
 
+from .bde_runner import bde_available, validate_bde, verified_bde
+
 PREFIX = '/api/science'
 MAX_LOG_BYTES = 10 * 1024 * 1024
 TIMEOUT_SECONDS = 900
 ACTIVE = {'queued', 'running'}
 ELEMENTS = ('H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og').split()
 APPLICATIONS = {
+    'bde': {'name': 'BDE', 'executable': 'bde-analyze', 'methods': ['ALFABET', 'Psi4'], 'bases': [], 'category': 'bond'},
     'xtb': {'name': 'xTB', 'executable': 'xtb', 'methods': ['GFN2-xTB', 'GFN1-xTB'], 'bases': [], 'category': 'semiempirical'},
     'orca': {'name': 'ORCA', 'executable': 'orca', 'methods': ['r2SCAN-3c', 'HF', 'B3LYP'], 'bases': ['def2-SVP', 'def2-TZVP'], 'category': 'quantum'},
     'gaussian': {'name': 'Gaussian', 'executable': 'g16', 'methods': ['HF', 'B3LYP', 'PBE1PBE'], 'bases': ['STO-3G', '6-31G(d)', 'def2SVP'], 'category': 'quantum'},
@@ -43,6 +46,8 @@ APPLICATIONS = {
 
 def application_executable(app_id):
     executable = shutil.which(APPLICATIONS[app_id]['executable'])
+    if app_id == 'bde' and not bde_available():
+        return None
     if app_id in REACTION_APPS and not runtime_available(app_id):
         return None
     if app_id == 'magus' and (not os.access(RUNTIME_PYTHON, os.X_OK) or
@@ -53,11 +58,13 @@ def application_executable(app_id):
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield']
+    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde']
     xyz: str = Field(default='', max_length=65536)
     smiles: str = Field(default='', max_length=32768)
+    input_kind: Literal['smiles', 'name'] = 'smiles'
+    compound_name: str = Field(default='', max_length=256)
     title: str = Field(default='', max_length=80)
-    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor'] = 'energy'
+    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde'] = 'energy'
     method: str = ''
     basis: str = ''
     charge: int = Field(default=0, ge=-10, le=10)
@@ -113,6 +120,10 @@ def prepare_input(request):
     basis = request.basis or (config['bases'][0] if config['bases'] else '')
     if method not in config['methods'] or (basis and basis not in config['bases']):
         raise ValueError('invalid_method')
+    if request.app_id == 'bde':
+        validate_bde(request)
+        request.method = method
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
     if request.app_id in REACTION_APPS:
         validate_request(request)
         return 'request.json', request.model_dump_json(indent=2), ['request.json']
@@ -303,7 +314,7 @@ class Manager:
                 job['exit_code'] = await self.process.wait()
             text = log_path.read_text(errors='replace')
             markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE',
-                       'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE'}
+                       'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE'}
             if job['status'] != 'cancelled':
                 success = job['exit_code'] == 0 and markers[job['app_id']].lower() in text.lower() and not job['error']
                 if success and job['app_id'] == 'magus':
@@ -316,6 +327,11 @@ class Manager:
                 if success and job['app_id'] in REACTION_APPS:
                     result = json.loads((directory / 'result.json').read_text())
                     success = verified_result(result, job['app_id'], len(request.smiles.strip().splitlines()))
+                    if success:
+                        job['result'] = result
+                if success and job['app_id'] == 'bde':
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = verified_bde(result) and result.get('mode') == request.method
                     if success:
                         job['result'] = result
                 job['status'] = 'succeeded' if success else 'failed'

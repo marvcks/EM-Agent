@@ -293,7 +293,7 @@ if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ] && [ -x /opt/em-agent-tools/magus/mac
   fi
 fi
 if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ]; then
-  for reaction_tool in aizynthfinder lcms2yield; do
+  for reaction_tool in aizynthfinder lcms2yield bde; do
     if [ -x "/opt/em-agent-tools/$reaction_tool/.venv/bin/python" ]; then
       mkdir -p "$OPENHANDS_DIR/skills"
       if [ ! -e "$OPENHANDS_DIR/skills/$reaction_tool" ] && [ ! -L "$OPENHANDS_DIR/skills/$reaction_tool" ]; then

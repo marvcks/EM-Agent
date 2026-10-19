@@ -1,7 +1,7 @@
 # F28 — EM-Agent scientific applications
 
 The manual science workbench submits bounded jobs without LLM calls. Reaction
-models accept SMILES; quantum tools and MAGUS retain their XYZ forms.
+models accept SMILES; BDE accepts SMILES or standard names; quantum tools and MAGUS retain their XYZ forms.
 
 Source: `src/routes/science-apps.tsx`, `src/components/features/science-apps/`, `src/api/science-apps-service.ts`, `tools/science_apps/`.
 
@@ -10,6 +10,7 @@ Source: `src/routes/science-apps.tsx`, `src/components/features/science-apps/`, 
 - `F28.catalog`: deployed tools appear with availability and the reaction category.
 - `F28.routes`: one target SMILES submits a real bounded retrosynthesis search.
 - `F28.cf`: product SMILES submits real UV correction-factor inference.
+- `F28.bde`: SMILES/name input submits ALFABET/Psi4, renders a numbered graph and per-bond kcal/mol values with a supported minimum.
 - `F28.cancel`: stopping an active job ends its process and preserves its log.
 - `F28.download`: downloads contain the original input and typed model results.
 - `F28.history`: reloading a job URL restores status, log and results.
@@ -29,6 +30,7 @@ this run explicitly. Do not use mocked science responses for these recipes.
 - **Catalog (`F28.catalog`).** `browser goto /canvas/science-apps`, `browser wait 'testid=science-app-aizynthfinder'`, `browser click 'role=button[name="反应模型"]'`. AiZynthFinder and lcms2yield cards show available; clicking a card reaches its form.
 - **Retrosynthesis (`F28.routes`).** `browser goto /canvas/science-apps/aizynthfinder`, `browser click 'role=button[name="使用 SMILES 示例"]'`, `browser fill 'label=搜索时长（秒）' 10`, `browser click testid=science-submit`. Wait for `testid=science-job-result` to show completed, then inspect returned and stock-solved counts and the log. Completed with zero stock-solved routes is valid, not proof of experimental feasibility.
 - **CF (`F28.cf`).** `browser goto /canvas/science-apps/lcms2yield`, `browser click 'role=button[name="使用 SMILES 示例"]'`, `browser click testid=science-submit`. Wait for completed, CF near 1.130069, and the statement that CF is not a yield percentage. No XYZ, charge or multiplicity input should appear.
+- **BDE (`F28.bde`).** `browser goto /canvas/science-apps/bde`, select ALFABET, use the ethanol example, submit, and wait for completion. Check explicit-H graph and 8 bond rows; B0 is the lowest supported bond at about 84.93 kcal/mol with the pinned model. Switch input to standard name and submit `ethanol`; resolved SMILES must be `CCO`. Select Psi4, submit SMILES `O` with 4 cores; both O–H bonds are about 116.43 kcal/mol under the pinned protocol. Download `results.zip`; confirm the graph, CSV, JSON, generated radical XYZ mapping and Psi4 optimized XYZ/thermochemistry records. Ring/multiple bonds must be labelled unsupported. Do not treat partial/timed-out jobs as completed minima.
 - **Stop (`F28.cancel`).** Submit an AiZynthFinder search with 600 seconds / 500 iterations. While running, `browser click 'role=button[name="停止计算"]'`. Status becomes cancelled and the server process group ends; verify log retained. Do not cancel an unrelated user job.
 - **Download (`F28.download`).** On a completed result, `browser click 'role=button[name="results.zip"]'`, then `browser downloads --inspect`. Check ZIP integrity and its `request.json` / `result.json`; CF has `correction_factors.csv`, routes have `routes.json` / `routes.txt`.
 - **History (`F28.history`).** On the completed `?job=ID` URL, `browser reload`, wait for the completed status and previous values. Navigate back to catalog and use that task's history link to restore it.

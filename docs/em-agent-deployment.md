@@ -169,3 +169,12 @@ AiZynthFinder 4.4.1 要求 NumPy <2；当前 PyArrow 26 wheel 运行时要求 Nu
 其依赖元数据未阻止解析出不兼容组合。该独立环境固定 `pyarrow==20.0.0`，
 通过完整路线搜索和依赖检查；不要直接更新为最新 PyArrow。阿司匹林测试的
 峰值 RSS 约 5.1 GiB，页面和 CLI 默认申请 6144 MB，仍非 OS 硬隔离。
+
+### BDE 运行时
+
+带 `io.em-agent.bde=1` 的镜像独立检查 `/opt/em-agent-tools/bde` 的 ALFABET venv、
+Psi4 环境、manifest、官方预处理文件和模型文件，并添加 BDE 与共享 Python 的只读挂载。
+`bde-analyze` 根据受控请求的模式选择解释器；`em-bde` 只通过现有科学 API 提交任务。
+启动时仅在无同名用户技能时链接 `bde`。模型文件在安装时下载并校验 SHA-256，推理期间
+不联网下载权重。版本、源提交、模型散列及 Python/Conda 锁文件保存在工具目录，安装与
+部署证据见本地 BDE 报告。不要在线改容器源码或升级 Agent Server 的包来修复科学依赖。

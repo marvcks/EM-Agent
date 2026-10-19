@@ -155,3 +155,11 @@ aside[data-collapsed="false"] [data-testid="sidebar-conversations-link"] { backg
   .em-science-detail-heading > div:nth-child(2) { flex-basis: 60%; }
   .em-science-history-row { gap: 9px; }
 }
+
+.em-bde-graph { width: 100%; height: auto; background: white; border-radius: 8px; }
+.em-bde-result { min-width: 0; }
+.em-bde-table-scroll { overflow-x: auto; max-height: 480px; }
+.em-bde-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.em-bde-table caption { text-align: left; padding: 12px 0; }
+.em-bde-table th, .em-bde-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--oh-border); }
+.em-bde-table tr[data-minimum="true"] { background: var(--oh-interactive-selected); font-weight: 600; }

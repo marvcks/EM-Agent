@@ -31,6 +31,16 @@ services:
 
 
 class DeploymentTests(unittest.TestCase):
+    def test_bde_mounts_are_independent_idempotent_and_preserve_rollback(self):
+        result = deploy.render_compose(COMPOSE, NEW_IMAGE, bde_tools=True)
+        self.assertIn('/opt/em-agent-tools/bde:/opt/em-agent-tools/bde:ro', result)
+        self.assertIn('/opt/em-agent-tools/python:/opt/em-agent-tools/python:ro', result)
+        self.assertNotIn('/opt/em-agent-tools/magus', result)
+        self.assertEqual(deploy.render_compose(result, NEW_IMAGE, bde_tools=True), result)
+        self.assertNotIn('/opt/em-agent-tools/bde', deploy.render_compose(COMPOSE, OLD_IMAGE, remove_frontend=False))
+        with self.assertRaises(ValueError):
+            deploy.render_compose(COMPOSE.replace('    volumes:\n', '    volumes:\n      - /other:/opt/em-agent-tools/bde:ro\n'), NEW_IMAGE, bde_tools=True)
+
     def test_reaction_mounts_have_independent_readonly_lifecycle(self):
         result = deploy.render_compose(COMPOSE, NEW_IMAGE, reaction_tools=True)
         for source, destination in deploy.REACTION_MOUNTS.items():

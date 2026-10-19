@@ -12,6 +12,27 @@ WATER = '3\nwater\nO 0 0 0\nH 0.7586 0 0.5043\nH -0.7586 0 0.5043\n'
 
 
 class ScienceTests(unittest.TestCase):
+    def test_bde_only_publishes_complete_verified_results(self):
+        async def exercise(root):
+            executable = root / 'bde-model'
+            manager = Manager(root / 'jobs')
+            result = {'verified': True, 'mode': 'ALFABET', 'unit': 'kcal/mol', 'canonical_smiles': 'CC',
+                      'bonds': [{'bond_index': 0, 'status': 'ok', 'bde_kcal_mol': 90.2}],
+                      'minimum_bond_index': 0, 'minimum_bde_kcal_mol': 90.2}
+            with patch('tools.science_apps.service.application_executable', return_value=str(executable)):
+                for valid in [False, True]:
+                    payload = result if valid else {**result, 'minimum_bond_index': 3}
+                    executable.write_text('#!/bin/sh\necho \'%s\' > result.json\necho EM_AGENT_BDE_COMPLETE\n' % __import__('json').dumps(payload))
+                    executable.chmod(0o755)
+                    job = manager.submit(JobRequest(app_id='bde', task='bde', smiles='CC'))
+                    await manager.run(job['id'])
+                    detail = manager.detail(job['id'])
+                    self.assertEqual(detail['status'], 'succeeded' if valid else 'failed')
+                    self.assertEqual(detail.get('result'), result if valid else None)
+                    self.assertIsNone(detail['energy_hartree'])
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
+
     def test_reaction_ipc_works_with_long_persistent_paths_and_cleans_scratch(self):
         async def exercise(root):
             executable = root / 'ipc-model'

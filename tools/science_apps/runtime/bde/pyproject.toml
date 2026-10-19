@@ -1,0 +1,9 @@
+[project]
+name = "em-agent-bde"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = ["tensorflow-cpu==2.15.1", "nfp==0.3.12", "rdkit==2023.9.6", "pandas==2.2.3", "pooch==1.8.2"]
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
