@@ -67,6 +67,22 @@ class DeploymentTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Conversations are running'):
                 deploy.check_idle()
 
+    def test_migrated_home_state_uses_runtime_account_without_following_links(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            private = root / 'input.gjf'
+            private.write_text('water')
+            private.chmod(0o600)
+            link = root / 'python'
+            link.symlink_to('/outside/python')
+            with patch.object(deploy.os, 'chown') as chown:
+                deploy.normalize_ownership(root, 10001, 10001)
+            self.assertEqual({call.args[0] for call in chown.call_args_list}, {root, private, link})
+            for call in chown.call_args_list:
+                self.assertEqual(call.args[1:], (10001, 10001))
+                self.assertFalse(call.kwargs['follow_symlinks'])
+            self.assertEqual(private.stat().st_mode & 0o777, 0o600)
+
     def test_unhealthy_candidate_automatically_restores_previous_image_and_files(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -95,6 +111,8 @@ class DeploymentTests(unittest.TestCase):
                 if args[:2] == ('docker', 'inspect'):
                     return json.dumps([previous])
                 if args[:3] == ('docker', 'exec', 'openhands'):
+                    if 'os.getuid()' in args[-1]:
+                        return json.dumps({'uid': 10001, 'gid': 10001})
                     return json.dumps([{'id': 'existing', 'status': 'finished'}])
                 if args[:3] == ('docker', 'exec', '-i'):
                     self.assertEqual(json.loads(input), before)

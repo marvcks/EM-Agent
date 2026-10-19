@@ -92,6 +92,14 @@ def file_manifest(root):
     return result
 
 
+def normalize_ownership(root, uid, gid):
+    # docker cp may remap archive ownership to root on the destination host.
+    # Home state must remain accessible to the image's actual runtime account.
+    # Preserve permission bits and never chown a symlink's external target.
+    for path in [root, *root.rglob('*')]:
+        os.chown(path, uid, gid, follow_symlinks=False)
+
+
 def check_idle():
     conversations = json.loads(run('docker', 'exec', 'openhands', 'python', '-c', PROBE))
     active = [item['id'] for item in conversations if item['status'] == 'running']
@@ -138,6 +146,8 @@ def deploy(root, image, commit):
         if destination not in mounts and (root / name).exists():
             raise ValueError(f'{root / name} exists without a matching mount')
     conversations = check_idle()
+    account = json.loads(run('docker', 'exec', 'openhands', 'python', '-c',
+                             'import os,json; print(json.dumps({"uid":os.getuid(),"gid":os.getgid()}))'))
     release = root / 'image-releases' / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + commit[:12])
     release.mkdir(parents=True, mode=0o700)
     compose = root / 'compose.yaml'
@@ -164,6 +174,7 @@ def deploy(root, image, commit):
         for name, destination in STATE_DIRS.items():
             if destination not in mounts:
                 run('docker', 'cp', '-a', f'openhands:{destination}', str(root / name))
+                normalize_ownership(root / name, account['uid'], account['gid'])
         manifest = file_manifest(root / 'workspace')
         (release / 'workspace-sha256.json').write_text(json.dumps(manifest, sort_keys=True))
         shutil.copytree(root / 'data', release / 'data-backup', symlinks=True)
