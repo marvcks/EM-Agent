@@ -313,6 +313,18 @@ def write_outputs(mol, result):
         writer.writerows(result['bonds'])
 
 
+def archive_outputs():
+    top_level = {'request.json', 'molecule.smi', 'parent-initial.xyz', 'fragment-structures.json',
+                 'result.json', 'molecule.png', 'bonds.csv', 'progress.json'}
+    with zipfile.ZipFile('results.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+        for path in Path('.').rglob('*'):
+            parts = path.parts
+            if not path.is_file() or path.is_symlink():
+                continue
+            if (len(parts) == 1 and path.name in top_level) or parts[0] in {'structures', 'generated-fragments'}:
+                archive.write(path)
+
+
 def main():
     request = json.loads(Path(sys.argv[1]).read_text())
     if hasattr(os, 'sched_setaffinity'):
@@ -341,10 +353,7 @@ def main():
     if not verified_bde(result):
         raise ValueError('Incomplete BDE result')
     write_outputs(mol, result)
-    with zipfile.ZipFile('results.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
-        for path in Path('.').rglob('*'):
-            if path.is_file() and path.name not in {'results.zip', 'output.log', 'job.json', 'job.json.next'} and not path.is_symlink():
-                archive.write(path)
+    archive_outputs()
     print(f"Minimum supported BDE: bond {minimum['bond_index']}, {minimum['bde_kcal_mol']:.4f} kcal/mol", flush=True)
     print('EM_AGENT_BDE_COMPLETE', flush=True)
 

@@ -125,7 +125,11 @@ export function BDEForm({
           }))
         }
       >
-        {t(I18nKey.SCIENCE$SMILES_EXAMPLE)}
+        {t(
+          input.input_kind === "name"
+            ? I18nKey.SCIENCE$BDE_NAME_EXAMPLE
+            : I18nKey.SCIENCE$SMILES_EXAMPLE,
+        )}
       </button>
       <p className="em-science-help">{t(I18nKey.SCIENCE$BDE_SCOPE)}</p>
       <p className="em-science-help">

@@ -1,5 +1,6 @@
 """BDE contract and chemistry tests; no model weights or Psi4 required."""
 import json
+import zipfile
 import unittest
 import tempfile
 import os
@@ -43,7 +44,7 @@ class BDEChemistryTests(unittest.TestCase):
                 parse_molecule(bad)
 
     def test_download_bundle_contains_generated_radical_coordinates_and_bond_graph(self):
-        from tools.science_apps.bde_runner import parse_molecule, enumerate_bonds, export_generated_structures, write_outputs
+        from tools.science_apps.bde_runner import parse_molecule, enumerate_bonds, export_generated_structures, write_outputs, archive_outputs
         molecule = parse_molecule('CC=O')
         rows, _ = enumerate_bonds(molecule)
         for row in rows:
@@ -56,6 +57,14 @@ class BDEChemistryTests(unittest.TestCase):
                 os.chdir(folder)
                 export_generated_structures(molecule)
                 write_outputs(molecule, result)
+                Path('scratch').mkdir()
+                Path('scratch/private-temporary-data').write_text('temporary')
+                archive_outputs()
+                with zipfile.ZipFile('results.zip') as archive:
+                    names = archive.namelist()
+                    self.assertIsNone(archive.testzip())
+                    self.assertTrue(any(name.startswith('generated-fragments/') for name in names))
+                    self.assertFalse(any(name.startswith('scratch/') for name in names))
                 mapping = json.loads(Path('fragment-structures.json').read_text())['bond_to_xyz']
                 self.assertEqual(len(mapping), 5)
                 for names in mapping.values():

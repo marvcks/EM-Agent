@@ -51661,5 +51661,22 @@
     "ca": "Provide one SMILES or standard name for a neutral singlet molecule.",
     "tr": "Provide one SMILES or standard name for a neutral singlet molecule.",
     "uk": "Provide one SMILES or standard name for a neutral singlet molecule."
+  },
+  "SCIENCE$BDE_NAME_EXAMPLE": {
+    "en": "Use ethanol name example",
+    "ja": "Use ethanol name example",
+    "zh-CN": "使用乙醇名称示例",
+    "zh-TW": "使用乙醇名称示例",
+    "ko-KR": "Use ethanol name example",
+    "no": "Use ethanol name example",
+    "ar": "Use ethanol name example",
+    "de": "Use ethanol name example",
+    "fr": "Use ethanol name example",
+    "it": "Use ethanol name example",
+    "pt": "Use ethanol name example",
+    "es": "Use ethanol name example",
+    "ca": "Use ethanol name example",
+    "tr": "Use ethanol name example",
+    "uk": "Use ethanol name example"
   }
 }
