@@ -4,6 +4,22 @@
 `codex/em-agent-ui`。每个部署使用完整 Git 提交号及不可变的本地镜像 ID，
 不使用 `latest` 选择线上版本。
 
+## 当前访问入口（2026-10-19）
+
+使用 `https://180.184.134.230/canvas/`，科学应用为
+`https://180.184.134.230/canvas/science-apps`。`openhands.*.sslip.io` 域名
+从公网访问时被火山云拦截，不能再把该域名作为已验证可用的入口提供给用户。
+IP 的有效 HTTPS 证书、现有 Basic Auth 均保留，IP 虚拟主机已转发到
+`127.0.0.1:8000` 的 OpenHands；旧 EM-Agent 的域名配置继续独立保留。
+
+登录用户名为 `openhands`。凭据记录保存在火山 `/root/openhands-access.json`
+（600 权限），密码不得写入仓库。Nginx 配置为
+`/etc/nginx/sites-available/em-agent-ip`，修改前备份在
+`/opt/openhands/backup/nginx-em-agent-ip-20261019T084212Z.conf`。
+已从服务器和本地 Mac 验证带认证的 HTTPS 请求返回 200，并确认返回
+OpenHands Canvas 的运行时 HTML；只检查容器内 200 或未认证 401 不足以
+证明用户能从公网打开页面。
+
 ## 镜像内容
 
 `docker/EM-Agent.Dockerfile` 使用以下已固定摘要的运行环境：

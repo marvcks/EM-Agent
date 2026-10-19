@@ -10,6 +10,7 @@
 - 手动科学任务属于本 fork 的独立服务 `/api/science`，不改变 SDK/Agent Server API；前端唯一适配器 `src/api/science-apps-service.ts` 使用同源和运行时 session key，不能跟随对话后端切换。此服务是下方仓库所有权/API 规则的明确项目例外。
 - 科学应用通过 `docker/EM-Agent.Dockerfile` 启用。`docker/entrypoint.sh` 用 `EM_AGENT_SCIENCE_APPS=1` 启动 loopback 服务 `:18002`，入口代理 `/api/science`，数据保存到已有持久卷 `~/.openhands/science-apps`。重启后未结束任务标为失败，不自动重跑。
 - 部署统一从 fork 的完整提交构建镜像：`scripts/em-agent/build-image.sh <40位提交>`；火山 `/opt/openhands/source` 为源码，`scripts/em-agent/deploy-image.py` 做检查、备份、切换与回滚。不要在线直接改容器源码或覆盖前端目录。详见 `docs/em-agent-deployment.md` 与 `docs/em-agent-science-apps.md`。
+- 当前已验证公网入口：`https://180.184.134.230/canvas/`（科学应用 `/canvas/science-apps`），Basic Auth 用户 `openhands`；密码只在服务器私有凭据记录中。旧 `openhands.*.sslip.io` 域名被云平台拦截，不再向用户提供。IP 的 Nginx 入口已转发 OpenHands 8000，详见部署文档。
 - 保留火山现有对话、workspace、MCP/Skills 配置和科学软件挂载。凭据仅用环境和现有私有配置，严禁提交。用户常用语音输入，按上下文理解转写，不必逐项纠错。
 
 ## General
