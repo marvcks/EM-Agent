@@ -256,9 +256,9 @@ How to write and prove new entries: [../mapping.md](../mapping.md).
 | F25 | [Backends, Cloud and sharing](F25-backends-and-cloud.md) | add, edit, remove and switch backends, per-backend consent, Cloud login, shared pages | backend selector | a second stack; Cloud account (blocked) | 29 |
 | F26 | [Launcher modes, Docker, desktop and library](F26-runtime-variants.md) | launcher flags, partial stacks, LAN bind, Docker, Electron, embeddable library | a terminal | Docker/Electron where available | 32 |
 | F27 | [Workspace tools](F27-workspace-tools.md) | terminal, browser, planner, task list, usage, `canvas_ui_control` | drawer tabs | LLM | 30 |
-| F28 | [EM-Agent scientific applications](F28-science-apps.md) | reaction SMILES, native models, queue, stop, downloads, history | `/science-apps/:appId?` | deployed science runtimes/models | 8 |
+| F28 | [EM-Agent scientific applications](F28-science-apps.md) | document uploads, reaction SMILES, native models, queue, stop, downloads, history | `/science-apps/:appId?` | deployed science runtimes/models, MinerU credential | 9 |
 
-28 families, 754 sub-features. `control-openhands map ids` lists every ID with its file.
+28 families, 756 sub-features. `control-openhands map ids` lists every ID with its file.
 
 ### Neighbouring families
 
