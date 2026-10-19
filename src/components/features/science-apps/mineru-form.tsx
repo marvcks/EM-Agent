@@ -29,7 +29,7 @@ export function MinerUForm({
   const [options, setOptions] = useState<ScienceDocumentOptions>({
     title: "",
     method: "vlm",
-    language: "auto",
+    language: "ch",
     enable_formula: true,
     enable_table: true,
   });
@@ -121,7 +121,6 @@ export function MinerUForm({
               })
             }
           >
-            <option value="auto">{t(I18nKey.SCIENCE$DOCUMENT_AUTO)}</option>
             <option value="ch">{t(I18nKey.SCIENCE$DOCUMENT_CHINESE)}</option>
             <option value="en">{t(I18nKey.SCIENCE$DOCUMENT_ENGLISH)}</option>
           </select>

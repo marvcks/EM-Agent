@@ -27,7 +27,7 @@ def main():
     submit = commands.add_parser('submit')
     submit.add_argument('document', type=Path)
     submit.add_argument('--method', choices=['vlm', 'pipeline'], default='vlm')
-    submit.add_argument('--language', choices=['auto', 'en', 'ch'], default='auto')
+    submit.add_argument('--language', choices=['en', 'ch'], default='ch')
     submit.add_argument('--no-formula', action='store_true')
     submit.add_argument('--no-table', action='store_true')
     submit.add_argument('--title', default='')

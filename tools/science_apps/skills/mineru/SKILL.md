@@ -19,7 +19,7 @@ em-mineru download JOB_ID /absolute/path/new-output-directory
 ```
 
 PDF/DOC/DOCX 直接提交，无需先转 PDF。默认 `--method vlm`，可选 `pipeline`。
-默认识别公式与表格，可用 `--no-formula`、`--no-table` 关闭；默认自动语言，
+默认识别公式与表格，可用 `--no-formula`、`--no-table` 关闭；默认中英混合识别，
 英文建议 `--language en`，中文建议 `--language ch`。
 
 同一队列串行执行，最多 10 个排队/运行任务。提交返回任务 ID 后每隔至少 5 秒查询。

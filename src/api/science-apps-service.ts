@@ -62,7 +62,7 @@ export interface ScienceJobRequest {
     | "bde"
     | "textify";
   document_name?: string;
-  language?: "auto" | "en" | "ch";
+  language?: "en" | "ch";
   enable_formula?: boolean;
   enable_table?: boolean;
   method: string;
@@ -128,7 +128,7 @@ export const MAX_SCIENCE_DOCUMENT_BYTES = 20 * 1024 * 1024;
 export interface ScienceDocumentOptions {
   title: string;
   method: "vlm" | "pipeline";
-  language: "auto" | "en" | "ch";
+  language: "en" | "ch";
   enable_formula: boolean;
   enable_table: boolean;
 }

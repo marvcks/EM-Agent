@@ -47,6 +47,7 @@ class MinerUTests(unittest.TestCase):
                         yield b'x' * 6
                     self.assertEqual(client.post(url, content=chunks(), headers=headers).status_code, 413)
                 self.assertEqual(client.post('/api/science/jobs', headers=headers, json={'app_id': 'mineru', 'task': 'textify', 'document_name': 'paper.pdf'}).status_code, 422)
+                self.assertEqual(client.post('/api/science/documents?filename=paper.pdf&language=auto', content=b'%PDF-1.4', headers=headers).status_code, 422)
 
     # @spec MINERU-002 — PDF and Word use MinerU and preserve linked assets
     def test_cloud_workflow_and_no_secrets_in_results(self):

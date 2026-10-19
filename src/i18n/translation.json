@@ -51764,23 +51764,6 @@
     "tr": "Belge dili",
     "uk": "Мова документа"
   },
-  "SCIENCE$DOCUMENT_AUTO": {
-    "en": "Automatic",
-    "zh-CN": "自动识别",
-    "zh-TW": "自動辨識",
-    "ja": "自動検出",
-    "ko-KR": "자동 감지",
-    "no": "Automatisk",
-    "ar": "تلقائي",
-    "de": "Automatisch",
-    "fr": "Automatique",
-    "it": "Automatica",
-    "pt": "Automático",
-    "es": "Automático",
-    "ca": "Automàtic",
-    "tr": "Otomatik",
-    "uk": "Автоматично"
-  },
   "SCIENCE$DOCUMENT_CHINESE": {
     "en": "Chinese",
     "zh-CN": "中文",

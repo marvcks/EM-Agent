@@ -64,7 +64,7 @@ class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru']
     document_name: str = Field(default='', max_length=128)
-    language: Literal['en', 'ch', 'auto'] = 'auto'
+    language: Literal['en', 'ch'] = 'ch'
     enable_formula: bool = True
     enable_table: bool = True
     xyz: str = Field(default='', max_length=65536)
@@ -452,7 +452,7 @@ def create_app(root=None, key=None):
     @app.post(PREFIX + '/documents', status_code=201)
     async def document(request: Request, filename: str, title: str = '',
                        method: Literal['vlm', 'pipeline'] = 'vlm',
-                       language: Literal['en', 'ch', 'auto'] = 'auto',
+                       language: Literal['en', 'ch'] = 'ch',
                        enable_formula: bool = True, enable_table: bool = True):
         try:
             size = int(request.headers.get('content-length', '0'))

@@ -55,7 +55,7 @@ it("surfaces an upload rejection as a typed science error", async () => {
     scienceAppsService.submitDocument(new File(["x"], "paper.pdf"), {
       title: "",
       method: "vlm",
-      language: "auto",
+      language: "ch",
       enable_formula: true,
       enable_table: true,
     }),

@@ -1,7 +1,8 @@
 # F28 — EM-Agent scientific applications
 
 The manual science workbench submits bounded jobs without LLM calls. Reaction
-models accept SMILES; BDE accepts SMILES or standard names; quantum tools and MAGUS retain their XYZ forms.
+models accept SMILES; BDE accepts SMILES or standard names; MinerU accepts PDF/Word;
+quantum tools and MAGUS retain their XYZ forms.
 
 Source: `src/routes/science-apps.tsx`, `src/components/features/science-apps/`, `src/api/science-apps-service.ts`, `tools/science_apps/`.
 
@@ -11,6 +12,7 @@ Source: `src/routes/science-apps.tsx`, `src/components/features/science-apps/`, 
 - `F28.routes`: one target SMILES submits a real bounded retrosynthesis search.
 - `F28.cf`: product SMILES submits real UV correction-factor inference.
 - `F28.bde`: SMILES/name input submits ALFABET/Psi4, renders a numbered graph and per-bond kcal/mol values with a supported minimum.
+- `F28.mineru`: PDF/DOC/DOCX uploads use official MinerU cloud parsing and return Markdown plus an original asset ZIP.
 - `F28.cancel`: stopping an active job ends its process and preserves its log.
 - `F28.download`: downloads contain the original input and typed model results.
 - `F28.history`: reloading a job URL restores status, log and results.
@@ -31,6 +33,7 @@ this run explicitly. Do not use mocked science responses for these recipes.
 - **Retrosynthesis (`F28.routes`).** `browser goto /canvas/science-apps/aizynthfinder`, `browser click 'role=button[name="使用 SMILES 示例"]'`, `browser fill 'label=搜索时长（秒）' 10`, `browser click testid=science-submit`. Wait for `testid=science-job-result` to show completed, then inspect returned and stock-solved counts and the log. Completed with zero stock-solved routes is valid, not proof of experimental feasibility.
 - **CF (`F28.cf`).** `browser goto /canvas/science-apps/lcms2yield`, `browser click 'role=button[name="使用 SMILES 示例"]'`, `browser click testid=science-submit`. Wait for completed, CF near 1.130069, and the statement that CF is not a yield percentage. No XYZ, charge or multiplicity input should appear.
 - **BDE (`F28.bde`).** `browser goto /canvas/science-apps/bde`, select ALFABET, use the ethanol example, submit, and wait for completion. Check explicit-H graph and 8 bond rows; B0 is the lowest supported bond at about 84.93 kcal/mol with the pinned model. Switch input to standard name and submit `ethanol`; resolved SMILES must be `CCO`. Select Psi4, submit SMILES `O` with 4 cores; both O–H bonds are about 116.43 kcal/mol under the pinned protocol. Download `results.zip`; confirm the graph, CSV, JSON, generated radical XYZ mapping and Psi4 optimized XYZ/thermochemistry records. Ring/multiple bonds must be labelled unsupported. Do not treat partial/timed-out jobs as completed minima.
+- **MinerU (`F28.mineru`).** From the catalog choose the data mining/annotation category and MinerU. `browser upload 'input[type=file]' /absolute/path/validation.docx`, select the English language pack, and `browser click testid=science-submit`. Wait for completion and inspect the log. Download both `document.md` and `results.zip` using their result buttons, then `browser downloads --inspect`; check known headings, text, table values and intact ZIP asset paths. Repeat with PDF. For cancellation submit a second document, stop the active job, then verify cancelled state after reload. No XYZ or charge fields appear. Use non-sensitive validation files: this sends data to the real MinerU cloud.
 - **Stop (`F28.cancel`).** Submit an AiZynthFinder search with 600 seconds / 500 iterations. While running, `browser click 'role=button[name="停止计算"]'`. Status becomes cancelled and the server process group ends; verify log retained. Do not cancel an unrelated user job.
 - **Download (`F28.download`).** On a completed result, `browser click 'role=button[name="results.zip"]'`, then `browser downloads --inspect`. Check ZIP integrity and its `request.json` / `result.json`; CF has `correction_factors.csv`, routes have `routes.json` / `routes.txt`.
 - **History (`F28.history`).** On the completed `?job=ID` URL, `browser reload`, wait for the completed status and previous values. Navigate back to catalog and use that task's history link to restore it.
@@ -41,6 +44,10 @@ this run explicitly. Do not use mocked science responses for these recipes.
 - UI text depends on locale; use `browser snapshot` before choosing localized names.
 - Requested memory is not a hard memory limit. Each job has at most 8 cores,
   8192 MB requested memory, 900 seconds and 128 atoms including H.
+- MinerU is a cloud adapter, not local model inference. Its input limit is 20 MiB;
+  the upstream checks the 200-page limit. Local stop does not cancel upstream
+  parsing or guarantee no quota consumption. `document.md` is a text copy;
+  preserve the extracted `results.zip` tree to retain linked images and JSON.
 - AiZynthFinder uses public USPTO policy and a snapshot of ZINC stock, not current
   commercial inventory. lcms2yield predicts CF; experimental yield quantification
   additionally needs measurements and the matching calibration protocol.
