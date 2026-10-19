@@ -435,7 +435,11 @@ function ScienceForm({
             setFileError(false);
           }}
         >
-          {t(I18nKey.SCIENCE$USE_EXAMPLE)}
+          {t(
+            isMagus
+              ? I18nKey.SCIENCE$USE_METHANE_EXAMPLE
+              : I18nKey.SCIENCE$USE_EXAMPLE,
+          )}
         </button>
       </div>
       <label className="em-science-upload">
@@ -627,7 +631,13 @@ function ScienceForm({
           />
         </label>
       </div>
-      <p className="em-science-help">{t(I18nKey.SCIENCE$RESOURCE_NOTE)}</p>
+      <p className="em-science-help">
+        {t(
+          isMagus
+            ? I18nKey.SCIENCE$MAGUS_RESOURCE_NOTE
+            : I18nKey.SCIENCE$RESOURCE_NOTE,
+        )}
+      </p>
       <ErrorMessage error={submit.error} />
       <BrandButton
         type="submit"

@@ -112,7 +112,7 @@ describe("manual scientific applications", () => {
     await screen.findByTestId("science-submit");
     expect(screen.queryByLabelText("SCIENCE$CHARGE")).not.toBeInTheDocument();
     await user.click(
-      screen.getByRole("button", { name: "SCIENCE$USE_EXAMPLE" }),
+      screen.getByRole("button", { name: "SCIENCE$USE_METHANE_EXAMPLE" }),
     );
     fireEvent.change(screen.getByLabelText("SCIENCE$GENERATIONS"), {
       target: { value: "2" },

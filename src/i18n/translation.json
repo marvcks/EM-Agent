@@ -50913,5 +50913,39 @@
     "ca": "Download candidate CIF/POSCAR files or results.zip. result.json records each candidate’s energy and convergence. A bounded search does not establish the global minimum or DFT accuracy.",
     "tr": "Download candidate CIF/POSCAR files or results.zip. result.json records each candidate’s energy and convergence. A bounded search does not establish the global minimum or DFT accuracy.",
     "uk": "Download candidate CIF/POSCAR files or results.zip. result.json records each candidate’s energy and convergence. A bounded search does not establish the global minimum or DFT accuracy."
+  },
+  "SCIENCE$USE_METHANE_EXAMPLE": {
+    "en": "Use methane example",
+    "ja": "Use methane example",
+    "zh-CN": "填入甲烷分子示例",
+    "zh-TW": "Use methane example",
+    "ko-KR": "Use methane example",
+    "no": "Use methane example",
+    "ar": "Use methane example",
+    "de": "Use methane example",
+    "fr": "Use methane example",
+    "it": "Use methane example",
+    "pt": "Use methane example",
+    "es": "Use methane example",
+    "ca": "Use methane example",
+    "tr": "Use methane example",
+    "uk": "Use methane example"
+  },
+  "SCIENCE$MAGUS_RESOURCE_NOTE": {
+    "en": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "ja": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "zh-CN": "仅使用 CPU，每项任务最多 8 核、8 GB 申请内存、15 分钟；申请内存不等于操作系统的硬限制。",
+    "zh-TW": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "ko-KR": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "no": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "ar": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "de": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "fr": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "it": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "pt": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "es": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "ca": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "tr": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit.",
+    "uk": "CPU only; up to 8 threads, 8 GiB requested memory and 15 minutes. Requested memory is not an OS enforced limit."
   }
 }
