@@ -7,6 +7,7 @@ import type { ColorThemeKey } from "#/themes/color-themes";
 
 // Exhaustive: adding a Canvas theme requires an explicit syntax palette.
 const SYNTAX_THEMES: Record<ColorThemeKey, typeof vs> = {
+  "em-agent": vs,
   "openhands-deepsea": vscDarkPlus,
   "openhands-neutral": vscDarkPlus,
   "openhands-neo": vscDarkPlus,

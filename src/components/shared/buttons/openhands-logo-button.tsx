@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import OpenHandsLogo from "#/assets/branding/openhands-logo.svg?react";
+import { Atom } from "lucide-react";
 import { NavigationLink } from "#/components/shared/navigation-link";
 import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
@@ -29,16 +29,14 @@ export function OpenHandsLogoButton({
     <NavigationLink
       to="/conversations"
       aria-label={ariaLabel}
-      className={cn(className)}
+      className={cn(className, "em-brand")}
     >
-      <OpenHandsLogo
+      <Atom
         width={logoWidth}
         height={logoHeight}
-        className={cn(
-          "shrink-0 text-contrast [&_path[fill=white]]:fill-current",
-          logoClassName,
-        )}
+        className={cn("em-brand-icon shrink-0", logoClassName)}
       />
+      <span className="em-brand-name">{t(I18nKey.BRANDING$EM_NAME)}</span>
     </NavigationLink>
   );
 }

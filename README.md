@@ -1,5 +1,10 @@
 <a name="readme-top"></a>
 
+> **EM-Agent fork:** This branch customizes OpenHands Canvas with the EM-Agent
+> research interface. See [EM-Agent development and maintenance](docs/em-agent.md)
+> for the pinned upstream base, build commands, and update workflow. The upstream
+> project overview follows below.
+
 <div align="center">
   <img src="https://assets.openhands.dev/logo-whitebackground.png" alt="OpenHands logo" width="340">
   <h1 align="center" style="border-bottom: none">Agent Canvas</h1>

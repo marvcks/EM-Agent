@@ -479,6 +479,20 @@ export default [
           allow: [
             // src/index.css owns the overlay animation outside the theme graph.
             "environment-switch-overlay",
+            // src/em-agent.css owns the EM-Agent workspace presentation.
+            "em-brand",
+            "em-brand-icon",
+            "em-brand-name",
+            "em-welcome",
+            "em-welcome-orbit",
+            "em-eyebrow",
+            "em-nav-heading",
+            "em-workspace-note",
+            "em-workspace-main",
+            "em-topbar",
+            "em-space-label",
+            "em-composer",
+            "em-disclaimer",
             // Selector target for has-[.conversation-overview-diffs-git-action:hover].
             "conversation-overview-diffs-git-action",
           ],

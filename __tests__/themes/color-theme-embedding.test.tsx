@@ -3,7 +3,7 @@ import { expect, it } from "vitest";
 import { AgentServerUIRoot } from "#/components/providers/agent-server-ui-root";
 
 it("does not apply a stored Canvas preference to an uninitialized library root", () => {
-  localStorage.setItem("openhands-color-theme", "light-plus");
+  localStorage.setItem("em-agent-color-theme", "openhands-neutral");
   try {
     render(
       <AgentServerUIRoot data-testid="embedded">
@@ -12,9 +12,9 @@ it("does not apply a stored Canvas preference to an uninitialized library root",
     );
     expect(screen.getByTestId("embedded").firstElementChild).toHaveAttribute(
       "data-theme",
-      "dark",
+      "light",
     );
   } finally {
-    localStorage.removeItem("openhands-color-theme");
+    localStorage.removeItem("em-agent-color-theme");
   }
 });

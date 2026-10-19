@@ -13,6 +13,9 @@ const path = require('path');
 // protocol/technical terms, placeholder-only format strings). Add a key here
 // only when the English value is genuinely correct for all languages.
 const IDENTICAL_VALUE_ALLOWLIST = new Set([
+  'BRANDING$EM_NAME',
+  'BRANDING$EM_EYEBROW',
+  'BRANDING$EM_SCIENCE',
   'ACTION_MESSAGE$ACP_TOOL',
   'API$TAVILY_KEY_EXAMPLE',
   'API$TVLY_KEY_EXAMPLE',

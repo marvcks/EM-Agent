@@ -372,6 +372,7 @@ export function HomeChatLauncher() {
           <PinnedAutomationsDashboard />
           <RunningAutomationsList />
         </div>
+        <p className="em-disclaimer">{t(I18nKey.BRANDING$EM_DISCLAIMER)}</p>
       </div>
 
       {isLocal ? (

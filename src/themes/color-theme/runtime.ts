@@ -1,7 +1,7 @@
 import { type ColorThemeKey } from "./types";
 import { COLOR_THEMES, DEFAULT_COLOR_THEME } from "./definitions";
 
-const STORAGE_KEY = "openhands-color-theme";
+const STORAGE_KEY = "em-agent-color-theme";
 let activeColorTheme: ColorThemeKey | null = null;
 const colorThemeListeners = new Set<() => void>();
 

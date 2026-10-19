@@ -12,6 +12,7 @@ import {
 } from "react-router";
 import "./tailwind.css";
 import "./index.css";
+import "./em-agent.css";
 import React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
@@ -227,7 +228,7 @@ export const links: LinksFunction = () => [
 ];
 
 export const meta: MetaFunction = () => [
-  { title: "OpenHands" },
+  { title: "EM-Agent" },
   { name: "description", content: "Let's Start Building!" },
 ];
 

@@ -62,6 +62,7 @@ const STATUS_MAP: Record<GitChangeStatus, string | IconType> = {
 };
 
 const MONACO_THEME_NAMES: Record<ColorThemeKey, string> = {
+  "em-agent": "openhands-diff-light-plus",
   "openhands-deepsea": "openhands-diff-dark",
   "openhands-neutral": "openhands-diff-dark",
   "openhands-neo": "openhands-diff-dark",

@@ -4,6 +4,7 @@ import { openhandsNeutral } from "./openhands-neutral";
 import { openhandsNeo } from "./openhands-neo";
 import { lightPlus } from "./light-plus";
 import { solarizedLight } from "./solarized-light";
+import { emAgent } from "./em-agent";
 
 /**
  * The theme registry.
@@ -12,6 +13,7 @@ import { solarizedLight } from "./solarized-light";
  * add its key to `ColorThemeKey` in `../types.ts`, and register it below.
  */
 export const COLOR_THEMES: Record<ColorThemeKey, ColorThemeDefinition> = {
+  "em-agent": emAgent,
   "openhands-deepsea": openhandsDeepsea,
   "openhands-neutral": openhandsNeutral,
   "openhands-neo": openhandsNeo,
@@ -19,7 +21,7 @@ export const COLOR_THEMES: Record<ColorThemeKey, ColorThemeDefinition> = {
   "solarized-light": solarizedLight,
 };
 
-export const DEFAULT_COLOR_THEME: ColorThemeKey = "openhands-neutral";
+export const DEFAULT_COLOR_THEME: ColorThemeKey = "em-agent";
 
 export const AVAILABLE_COLOR_THEMES = Object.entries(COLOR_THEMES).map(
   ([key, def]) => ({ key: key as ColorThemeKey, label: def.label }),

@@ -30,6 +30,7 @@ import { CanvasExtensionsRuntimeProvider } from "#/components/features/canvas-ex
 import { isMacDesktopShell } from "#/utils/desktop-shell";
 import { useDesktopFullScreen } from "#/hooks/use-desktop-full-screen";
 import { cn } from "#/utils/utils";
+import { EmWorkspaceTopbar } from "#/components/shared/em-workspace-topbar";
 
 const EnvironmentSwitchOverlay = React.lazy(
   () => import("#/components/features/backends/environment-switch-overlay"),
@@ -175,7 +176,8 @@ function MainAppContent() {
             <TitleBarDragRegion />
             <Sidebar />
 
-            <div className="flex min-h-0 flex-col w-full min-w-0 h-full gap-3">
+            <div className="em-workspace-main flex min-h-0 flex-col w-full min-w-0 h-full gap-3">
+              <EmWorkspaceTopbar />
               {!hideMobileSidebarMenuBar ? <SidebarMobileMenuBar /> : null}
               {config.data &&
                 (config.data.maintenance_start_time ||

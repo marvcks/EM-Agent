@@ -81,40 +81,42 @@ describe("color themes", () => {
     unsubscribe();
   });
 
-  it.each(["light-plus", "solarized-light", "openhands-neutral"] as const)(
-    "bootstraps %s before React mounts",
-    (key) => {
-      // Reproduce the prerendered dark wrapper while app initialization waits.
-      render(<AgentServerUIRoot data-testid="shell">Canvas</AgentServerUIRoot>);
-      const wrapper = screen.getByTestId("shell").firstElementChild!;
-      expect(wrapper).toHaveAttribute("data-theme", "dark");
-      localStorage.setItem("openhands-color-theme", key);
-      document.getElementById("oh-color-theme-override")?.remove();
-      window.eval(COLOR_THEME_BOOTSTRAP_SCRIPT);
-      expect(
-        document.getElementById("oh-color-theme-override")?.textContent,
-      ).toBe(getColorThemeCss(key));
-      expect(document.documentElement.style.colorScheme).toBe(
+  it.each([
+    "em-agent",
+    "light-plus",
+    "solarized-light",
+    "openhands-neutral",
+  ] as const)("bootstraps %s before React mounts", (key) => {
+    // Reproduce the prerendered default wrapper while initialization waits.
+    render(<AgentServerUIRoot data-testid="shell">Canvas</AgentServerUIRoot>);
+    const wrapper = screen.getByTestId("shell").firstElementChild!;
+    expect(wrapper).toHaveAttribute("data-theme", "light");
+    localStorage.setItem("em-agent-color-theme", key);
+    document.getElementById("oh-color-theme-override")?.remove();
+    window.eval(COLOR_THEME_BOOTSTRAP_SCRIPT);
+    expect(
+      document.getElementById("oh-color-theme-override")?.textContent,
+    ).toBe(getColorThemeCss(key));
+    expect(document.documentElement.style.colorScheme).toBe(
+      key === "openhands-neutral" ? "dark" : "light",
+    );
+    // A later base sheet must not restore HeroUI's dark native controls.
+    const heroSheet = document.createElement("style");
+    heroSheet.textContent = ".dark { color-scheme: dark; }";
+    document.head.appendChild(heroSheet);
+    try {
+      expect(getComputedStyle(wrapper).colorScheme).toBe(
         key === "openhands-neutral" ? "dark" : "light",
       );
-      // A later base sheet must not restore HeroUI's dark native controls.
-      const heroSheet = document.createElement("style");
-      heroSheet.textContent = ".dark { color-scheme: dark; }";
-      document.head.appendChild(heroSheet);
-      try {
-        expect(getComputedStyle(wrapper).colorScheme).toBe(
-          key === "openhands-neutral" ? "dark" : "light",
-        );
-      } finally {
-        heroSheet.remove();
-      }
-    },
-  );
+    } finally {
+      heroSheet.remove();
+    }
+  });
 
   it.each(["missing-theme", "constructor", "__proto__"])(
     "rejects invalid stored key %s",
     (key) => {
-      localStorage.setItem("openhands-color-theme", key);
+      localStorage.setItem("em-agent-color-theme", key);
       expect(readPersistedColorTheme()).toBe(DEFAULT_COLOR_THEME);
       document.getElementById("oh-color-theme-override")?.remove();
       expect(() => window.eval(COLOR_THEME_BOOTSTRAP_SCRIPT)).not.toThrow();

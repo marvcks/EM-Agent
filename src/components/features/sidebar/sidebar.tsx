@@ -239,6 +239,7 @@ export function Sidebar() {
           <aside
             aria-label={t(I18nKey.SIDEBAR$NAVIGATION_LABEL)}
             data-testid="sidebar-mobile-drawer"
+            data-collapsed="false"
             aria-hidden={!mobileDrawerVisible}
             className={cn(
               "fixed inset-y-0 left-0 z-50 flex min-h-0 w-[min(300px,85vw)] flex-col bg-canvas-base",

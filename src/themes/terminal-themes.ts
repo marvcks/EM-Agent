@@ -60,6 +60,7 @@ const solarized: ITheme = {
 };
 
 const palettes: Record<ColorThemeKey, ITheme> = {
+  "em-agent": light,
   "openhands-deepsea": dark,
   "openhands-neutral": dark,
   "openhands-neo": dark,

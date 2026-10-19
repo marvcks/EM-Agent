@@ -20,6 +20,9 @@ export function SidebarMobileMenuBar() {
       aria-label={t(I18nKey.SIDEBAR$NAVIGATION_LABEL)}
     >
       <SidebarMobileMenuToggle />
+      <span className="text-sm font-semibold text-contrast">
+        {t(I18nKey.BRANDING$EM_NAME)}
+      </span>
       {topBar.mode === "back" && topBar.backTo ? (
         <button
           type="button"

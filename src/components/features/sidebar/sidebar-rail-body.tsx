@@ -6,6 +6,7 @@ import {
   Plus,
   Server,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import { OpenHandsLogoButton } from "#/components/shared/buttons/openhands-logo-button";
 import { NavigationLink } from "#/components/shared/navigation-link";
@@ -202,7 +203,6 @@ export function SidebarRailBody({
       </div>
 
       <nav className={sidebarNavListClassName(collapsed)}>
-        <CommandMenuTrigger collapsed={collapsed} />
         <SidebarNavLink
           to="/conversations"
           end
@@ -211,6 +211,10 @@ export function SidebarRailBody({
           collapsed={collapsed}
           icon={<Plus width={ICON_SIZE} height={ICON_SIZE} />}
         />
+        {!collapsed && (
+          <div className="em-nav-heading">{t(I18nKey.BRANDING$EM_EXPLORE)}</div>
+        )}
+        <CommandMenuTrigger collapsed={collapsed} />
         <SidebarNavLink
           to={CUSTOMIZE_PATH}
           label={t(I18nKey.NAV$CUSTOMIZE)}
@@ -395,6 +399,13 @@ export function SidebarRailBody({
 
       {!collapsed ? (
         <>
+          <div className="em-workspace-note">
+            <Sparkles size={16} />
+            <div>
+              {t(I18nKey.BRANDING$EM_NOTE)}
+              <span>{t(I18nKey.BRANDING$EM_SCIENCE)}</span>
+            </div>
+          </div>
           <div className="mb-2 shrink-0 pr-2.5">
             <SidebarOnboardingChecklist collapsed={collapsed} />
           </div>
