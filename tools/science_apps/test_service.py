@@ -83,6 +83,22 @@ class ScienceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             asyncio.run(exercise(Path(folder)))
 
+    def test_orca_parallel_workers_use_single_threaded_blas(self):
+        async def exercise(root):
+            executable = root / 'fake-orca'
+            executable.write_text('#!/bin/sh\necho "threads=$OMP_NUM_THREADS blas=$OPENBLAS_NUM_THREADS"\necho "ORCA TERMINATED NORMALLY"\n')
+            executable.chmod(0o755)
+            manager = Manager(root / 'jobs')
+            with patch('tools.science_apps.service.shutil.which', return_value=str(executable)):
+                job = manager.submit(JobRequest(app_id='orca', xyz=WATER, cores=4))
+                await manager.run(job['id'])
+            detail = manager.detail(job['id'])
+            self.assertEqual(detail['status'], 'succeeded')
+            self.assertIn('threads=1 blas=1', detail['log'])
+            self.assertIn('nprocs 4', manager.file(job['id'], 'input.inp').read_text())
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
+
     def test_failure_timeout_and_persisted_files(self):
         async def exercise(root):
             executable = root / 'fake-xtb'

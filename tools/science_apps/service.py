@@ -229,7 +229,9 @@ class Manager:
         executable = shutil.which(APPLICATIONS[request.app_id]['executable'])
         scratch = directory / 'scratch'
         scratch.mkdir(exist_ok=True)
-        environment = {**os.environ, 'OMP_NUM_THREADS': str(request.cores), 'OPENBLAS_NUM_THREADS': str(request.cores),
+        # ORCA uses PAL/MPI workers; each worker must not spawn another cores-sized BLAS pool.
+        threads = '1' if request.app_id == 'orca' else str(request.cores)
+        environment = {**os.environ, 'OMP_NUM_THREADS': threads, 'OPENBLAS_NUM_THREADS': threads,
                        'GAUSS_SCRDIR': str(scratch.resolve()), 'TMPDIR': str(scratch.resolve())}
         log_path = directory / 'output.log'
         try:
