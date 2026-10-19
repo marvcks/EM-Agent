@@ -6,6 +6,7 @@ import { ScienceAppsPage } from "#/components/features/science-apps/science-apps
 import {
   scienceAppsService,
   SCIENCE_EXAMPLE_XYZ,
+  SCIENCE_MAGUS_EXAMPLE_XYZ,
   type ScienceApplication,
   type ScienceJobDetail,
 } from "#/api/science-apps-service";
@@ -22,6 +23,17 @@ vi.mock("#/api/science-apps-service", async (importOriginal) => ({
   },
 }));
 const applications: ScienceApplication[] = [
+  {
+    id: "magus",
+    name: "MAGUS",
+    category: "crystal",
+    available: true,
+    methods: ["MACE-OFF23"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  },
   {
     id: "xtb",
     name: "xTB",
@@ -86,6 +98,47 @@ beforeEach(() => {
 });
 
 describe("manual scientific applications", () => {
+  it("submits a bounded molecular crystal search and shows energies in eV", async () => {
+    const user = userEvent.setup();
+    vi.mocked(scienceAppsService.job).mockResolvedValue({
+      ...job,
+      app_id: "magus",
+      status: "succeeded",
+      energy_ev: -123.5,
+    });
+    renderWithProviders(
+      <ScienceAppsPage appId="magus" jobId="abc" onSelectJob={vi.fn()} />,
+    );
+    await screen.findByTestId("science-submit");
+    expect(screen.queryByLabelText("SCIENCE$CHARGE")).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "SCIENCE$USE_EXAMPLE" }),
+    );
+    fireEvent.change(screen.getByLabelText("SCIENCE$GENERATIONS"), {
+      target: { value: "2" },
+    });
+    await user.click(screen.getByTestId("science-submit"));
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          app_id: "magus",
+          task: "search",
+          xyz: SCIENCE_MAGUS_EXAMPLE_XYZ,
+          model_size: "medium",
+          molecules_per_cell: 4,
+          generations: 2,
+          population_size: 6,
+          volume_min: 180,
+          volume_max: 400,
+          charge: 0,
+          multiplicity: 1,
+        }),
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByText("SCIENCE$ENERGY_EV_VALUE")).toBeInTheDocument();
+  });
+
   it("filters deployed applications and links to the standalone workbench", async () => {
     const user = userEvent.setup();
     renderWithProviders(<ScienceAppsPage jobId={null} onSelectJob={vi.fn()} />);

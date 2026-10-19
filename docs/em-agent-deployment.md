@@ -64,6 +64,32 @@ bash scripts/em-agent/build-image.sh "$release_commit"
 
 ## 切换生产版本
 
+### MAGUS 运行时准备
+
+MAGUS 含 CPython 3.10 原生扩展，不能装到 Agent Server 的 Python 3.13 或共享 MACE 的
+Python 3.12 环境。火山已经安装并验证：
+
+- `/opt/em-agent-tools/magus/2.2.0/`：原有 MAGUS 发行版及 Python 3.10。
+- `/opt/em-agent-tools/magus/mace-runner/.venv/`：用 uv 从
+  `/root/EM-Agent-Tools/magus/mace-runner/{pyproject.toml,uv.lock}` 安装的独立环境。
+- `/root/EM-Agent-Tools/mace-off23/models/`：原有三份已校验共享权重。
+
+重建运行环境可在宿主机执行（保持 wheel 相对目录关系）：
+
+```sh
+mkdir -p /opt/em-agent-tools/magus/mace-runner /opt/em-agent-tools/magus/installers/python-wheels
+cp /root/EM-Agent-Tools/magus/mace-runner/pyproject.toml /root/EM-Agent-Tools/magus/mace-runner/uv.lock \
+  /opt/em-agent-tools/magus/mace-runner/
+cp /root/EM-Agent-Tools/magus/installers/python-wheels/*.whl /opt/em-agent-tools/magus/installers/python-wheels/
+uv sync --frozen --project /opt/em-agent-tools/magus/mace-runner \
+  --python /opt/em-agent-tools/magus/2.2.0/bin/python
+```
+
+带 `io.em-agent.magus=1` 标签的新镜像部署时检查这些路径，并自动添加两个只读挂载：
+`/opt/em-agent-tools/magus` 同路径挂载；共享 models 目录挂到容器
+`/opt/em-agent-tools/mace-off23/models`。容器用户不需要访问宿主机 `/root`。
+权重、安装器和运行环境不进入 Git 或应用镜像。旧版本回滚沿用保存的 Compose。
+
 ```sh
 python3 scripts/em-agent/deploy-image.py deploy \
   --image "em-agent:$release_commit" --commit "$release_commit"

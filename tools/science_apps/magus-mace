@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
+exec /opt/em-agent-tools/magus/mace-runner/.venv/bin/python /opt/agent-canvas/science_apps/magus_runner.py "$@"

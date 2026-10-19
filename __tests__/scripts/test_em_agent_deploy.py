@@ -31,6 +31,16 @@ services:
 
 
 class DeploymentTests(unittest.TestCase):
+    def test_magus_mounts_are_readonly_idempotent_and_not_added_to_rollback(self):
+        result = deploy.render_compose(COMPOSE, NEW_IMAGE, science_tools=True)
+        for source, destination in deploy.SCIENCE_MOUNTS.items():
+            self.assertIn(f'{source}:{destination}:ro', result)
+        self.assertEqual(deploy.render_compose(result, NEW_IMAGE, science_tools=True), result)
+        rollback = deploy.render_compose(COMPOSE, OLD_IMAGE, remove_frontend=False)
+        self.assertNotIn('/opt/em-agent-tools/magus', rollback)
+        with self.assertRaises(ValueError):
+            deploy.render_compose(COMPOSE.replace('    volumes:\n', '    volumes:\n      - /other:/opt/em-agent-tools/magus:ro\n'), NEW_IMAGE, science_tools=True)
+
     def test_image_switch_retains_configuration_and_adds_state_mounts_once(self):
         result = deploy.render_compose(COMPOSE, NEW_IMAGE)
         self.assertIn(f'image: {NEW_IMAGE}', result)

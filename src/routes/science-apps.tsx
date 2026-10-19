@@ -3,12 +3,14 @@ import { ScienceAppsPage } from "#/components/features/science-apps/science-apps
 import {
   SCIENCE_APPS_PATH,
   SCIENCE_JOB_PARAM,
+  SCIENCE_APP_IDS,
+  type ScienceAppId,
 } from "#/api/science-apps-service";
 
 export default function ScienceAppsRoute() {
   const { appId } = useParams();
   const [params, setParams] = useSearchParams();
-  if (appId && !["xtb", "orca", "gaussian"].includes(appId)) {
+  if (appId && !SCIENCE_APP_IDS.includes(appId as ScienceAppId)) {
     return <Navigate to={SCIENCE_APPS_PATH} replace />;
   }
   return (

@@ -19,6 +19,7 @@ LABEL org.opencontainers.image.title="EM-Agent"
 LABEL org.opencontainers.image.source="https://github.com/marvcks/EM-Agent"
 LABEL org.opencontainers.image.revision="${SOURCE_COMMIT}"
 LABEL io.em-agent.upstream.revision="f07aebdf5cdd71f4a05ebcf30f8bef5e4e3b70b9"
+LABEL io.em-agent.magus="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${SOURCE_COMMIT}
 USER root
@@ -28,5 +29,7 @@ COPY --from=frontend-build /build/release.json /opt/em-agent/release.json
 ENV EM_AGENT_SCIENCE_APPS=1
 COPY docker/entrypoint.sh /opt/agent-canvas/entrypoint.sh
 RUN chmod 755 /opt/agent-canvas/entrypoint.sh
-COPY tools/science_apps/service.py /opt/agent-canvas/science_apps/service.py
+COPY tools/science_apps/ /opt/agent-canvas/science_apps/
+RUN install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magus-mace \
+ && install -m 755 /opt/agent-canvas/science_apps/em-magus /usr/local/bin/em-magus
 USER openhands

@@ -283,6 +283,15 @@ export AUTOMATION_AGENT_SERVER_URL="${AUTOMATION_AGENT_SERVER_URL:-http://127.0.
 # FinishTool registration lets automation runs resolve the tool on their
 # remote conversations (see the note at the bottom of tools/canvas_ui_tool.py).
 export OH_EXTRA_PYTHON_PATH="${OH_EXTRA_PYTHON_PATH:-/opt/agent-canvas/tools}"
+
+# Expose the bundled tool instructions through the SDK's existing user-skill loader.
+# Never overwrite a user-maintained skill with the same name.
+if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ] && [ -x /opt/em-agent-tools/magus/mace-runner/.venv/bin/python ]; then
+  mkdir -p "$OPENHANDS_DIR/skills"
+  if [ ! -e "$OPENHANDS_DIR/skills/magus" ] && [ ! -L "$OPENHANDS_DIR/skills/magus" ]; then
+    ln -s /opt/agent-canvas/science_apps/skills/magus "$OPENHANDS_DIR/skills/magus"
+  fi
+fi
 AGENT_SERVER_IMPORT_MODULES="canvas_ui_tool"
 
 # Track child PIDs so we can clean up on exit.

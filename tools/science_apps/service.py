@@ -22,6 +22,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from .magus_runner import MODEL_DIR, RUNTIME_PYTHON, validate_search
+
 PREFIX = '/api/science'
 MAX_LOG_BYTES = 10 * 1024 * 1024
 TIMEOUT_SECONDS = 900
@@ -31,21 +33,36 @@ APPLICATIONS = {
     'xtb': {'name': 'xTB', 'executable': 'xtb', 'methods': ['GFN2-xTB', 'GFN1-xTB'], 'bases': [], 'category': 'semiempirical'},
     'orca': {'name': 'ORCA', 'executable': 'orca', 'methods': ['r2SCAN-3c', 'HF', 'B3LYP'], 'bases': ['def2-SVP', 'def2-TZVP'], 'category': 'quantum'},
     'gaussian': {'name': 'Gaussian', 'executable': 'g16', 'methods': ['HF', 'B3LYP', 'PBE1PBE'], 'bases': ['STO-3G', '6-31G(d)', 'def2SVP'], 'category': 'quantum'},
+    'magus': {'name': 'MAGUS', 'executable': 'magus-mace', 'methods': ['MACE-OFF23'], 'bases': [], 'category': 'crystal'},
 }
+
+
+def application_executable(app_id):
+    executable = shutil.which(APPLICATIONS[app_id]['executable'])
+    if app_id == 'magus' and (not os.access(RUNTIME_PYTHON, os.X_OK) or
+            not all((MODEL_DIR / f'MACE-OFF23_{size}.model').is_file() for size in ('small', 'medium', 'large'))):
+        return None
+    return executable
 
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['xtb', 'orca', 'gaussian']
+    app_id: Literal['xtb', 'orca', 'gaussian', 'magus']
     xyz: str = Field(min_length=5, max_length=65536)
     title: str = Field(default='', max_length=80)
-    task: Literal['energy', 'optimize'] = 'energy'
+    task: Literal['energy', 'optimize', 'search'] = 'energy'
     method: str = ''
     basis: str = ''
     charge: int = Field(default=0, ge=-10, le=10)
     multiplicity: int = Field(default=1, ge=1, le=5)
     cores: int = Field(default=2, ge=1, le=8)
     memory_mb: int = Field(default=2048, ge=512, le=8192)
+    model_size: Literal['small', 'medium', 'large'] = 'medium'
+    molecules_per_cell: int = Field(default=4, ge=1, le=8)
+    population_size: int = Field(default=6, ge=4, le=12)
+    generations: int = Field(default=3, ge=1, le=10)
+    volume_min: float = Field(default=180.0, ge=30, le=20000, allow_inf_nan=False)
+    volume_max: float = Field(default=400.0, ge=30, le=20000, allow_inf_nan=False)
 
 
 def now():
@@ -86,6 +103,11 @@ def prepare_input(request):
     if method not in config['methods'] or (basis and basis not in config['bases']):
         raise ValueError('invalid_method')
     atoms = parse_xyz(request.xyz, request.charge, request.multiplicity)
+    if request.app_id == 'magus':
+        validate_search(request.model_dump(), atoms)
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
+    if request.task == 'search':
+        raise ValueError('invalid_method')
     xyz = f'{len(atoms)}\nEM-Agent manual calculation\n' + '\n'.join(atoms) + '\n'
     geometry = '\n'.join(atoms)
     if request.app_id == 'xtb':
@@ -141,7 +163,7 @@ class Manager:
         if sum(job['status'] in ACTIVE for job in self.jobs.values()) >= 10:
             raise HTTPException(429, 'queue_full')
         name, content, _ = prepare_input(request)
-        executable = shutil.which(APPLICATIONS[request.app_id]['executable'])
+        executable = application_executable(request.app_id)
         if not executable:
             raise HTTPException(409, 'app_unavailable')
         job_id = uuid4().hex
@@ -151,7 +173,7 @@ class Manager:
         (directory / 'structure.xyz').write_text(request.xyz)
         job = {'id': job_id, 'app_id': request.app_id, 'title': request.title.strip() or APPLICATIONS[request.app_id]['name'],
                'status': 'queued', 'created_at': now(), 'started_at': None, 'finished_at': None,
-               'error': None, 'energy_hartree': None, 'exit_code': None, 'request': request.model_dump()}
+               'error': None, 'energy_hartree': None, 'energy_ev': None, 'exit_code': None, 'request': request.model_dump()}
         self.jobs[job_id] = job
         self.save(job)
         self.queue.put_nowait(job_id)
@@ -226,12 +248,13 @@ class Manager:
         directory = self.directory(job_id)
         request = JobRequest(**job['request'])
         name, _, args = prepare_input(request)
-        executable = shutil.which(APPLICATIONS[request.app_id]['executable'])
+        executable = application_executable(request.app_id)
         scratch = directory / 'scratch'
         scratch.mkdir(exist_ok=True)
         # ORCA uses PAL/MPI workers; each worker must not spawn another cores-sized BLAS pool.
         threads = '1' if request.app_id == 'orca' else str(request.cores)
         environment = {**os.environ, 'OMP_NUM_THREADS': threads, 'OPENBLAS_NUM_THREADS': threads,
+                       'MKL_NUM_THREADS': threads, 'PYTHONNOUSERSITE': '1',
                        'GAUSS_SCRDIR': str(scratch.resolve()), 'TMPDIR': str(scratch.resolve())}
         log_path = directory / 'output.log'
         try:
@@ -256,15 +279,22 @@ class Manager:
                         continue
                 job['exit_code'] = await self.process.wait()
             text = log_path.read_text(errors='replace')
-            markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian'}
+            markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE'}
             if job['status'] != 'cancelled':
                 success = job['exit_code'] == 0 and markers[job['app_id']].lower() in text.lower() and not job['error']
+                if success and job['app_id'] == 'magus':
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = (result.get('verified') is True and result.get('candidate_count', 0) > 0
+                               and result.get('converged_count', 0) > 0
+                               and math.isfinite(result.get('energy_eV', float('nan'))))
+                    if success:
+                        job['energy_ev'] = result['energy_eV']
                 job['status'] = 'succeeded' if success else 'failed'
                 if not success and not job['error']:
                     job['error'] = 'calculation_failed'
                 patterns = {'xtb': r'TOTAL ENERGY\s+(-?[\d.]+)', 'orca': r'FINAL SINGLE POINT ENERGY\s+(-?[\d.]+)',
                             'gaussian': r'SCF Done:.*?=\s*(-?[\d.]+)'}
-                energies = re.findall(patterns[job['app_id']], text)
+                energies = re.findall(patterns[job['app_id']], text) if job['app_id'] != 'magus' else []
                 if success and energies:
                     job['energy_hartree'] = float(energies[-1])
         except Exception:
@@ -335,7 +365,7 @@ def create_app(root=None, key=None):
     @app.get(PREFIX + '/apps')
     async def apps():
         return [{'id': app_id, **{k: v for k, v in config.items() if k != 'executable'},
-                 'available': shutil.which(config['executable']) is not None,
+                 'available': application_executable(app_id) is not None,
                  'max_cores': 8, 'max_memory_mb': 8192, 'timeout_seconds': TIMEOUT_SECONDS} for app_id, config in APPLICATIONS.items()]
 
     @app.get(PREFIX + '/jobs')

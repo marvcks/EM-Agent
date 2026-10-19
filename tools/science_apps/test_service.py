@@ -12,6 +12,42 @@ WATER = '3\nwater\nO 0 0 0\nH 0.7586 0 0.5043\nH -0.7586 0 0.5043\n'
 
 
 class ScienceTests(unittest.TestCase):
+    def test_magus_validates_molecular_search_before_queueing(self):
+        request = JobRequest(app_id='magus', xyz=WATER, task='search', method='MACE-OFF23',
+                             molecules_per_cell=4, generations=3, population_size=6,
+                             volume_min=180.0, volume_max=400.0)
+        name, content, args = prepare_input(request)
+        self.assertEqual(name, 'request.json')
+        self.assertEqual(__import__('json').loads(content)['molecules_per_cell'], 4)
+        self.assertEqual(args, ['request.json'])
+        for changes in [{'charge': 2}, {'multiplicity': 3}, {'task': 'energy'},
+                        {'volume_min': 401.0}, {'xyz': '1\nFe\nFe 0 0 0\n'},
+                        {'molecules_per_cell': 8, 'xyz': '18\nwater\n' + '\n'.join(WATER.splitlines()[2:] * 6)}]:
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                prepare_input(request.model_copy(update=changes))
+
+    def test_magus_process_requires_verified_result_and_reports_ev(self):
+        async def exercise(root):
+            executable = root / 'fake-magus'
+            executable.write_text('#!/bin/sh\necho "EM_AGENT_MAGUS_COMPLETE"\n')
+            executable.chmod(0o755)
+            manager = Manager(root / 'jobs')
+            request = JobRequest(app_id='magus', xyz=WATER, task='search')
+            with patch('tools.science_apps.service.application_executable', return_value=str(executable)):
+                job = manager.submit(request)
+                await manager.run(job['id'])
+                self.assertEqual(manager.detail(job['id'])['status'], 'failed')
+                executable.write_text('#!/bin/sh\necho \'{"verified":true,"energy_eV":-123.5,"candidate_count":4,"converged_count":3}\' > result.json\necho EM_AGENT_MAGUS_COMPLETE\n')
+                job = manager.submit(request)
+                await manager.run(job['id'])
+            finished = manager.detail(job['id'])
+            self.assertEqual(finished['status'], 'succeeded')
+            self.assertEqual(finished['energy_ev'], -123.5)
+            self.assertIsNone(finished['energy_hartree'])
+            self.assertIn('result.json', [item['name'] for item in finished['files']])
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
+
     def test_xyz_and_method_validation(self):
         for bad in ['1\ncomment\nH nan 0 0', '2\ncomment\nH 0 0 0', '1\ncomment\nXx 0 0 0', WATER + '! command\n']:
             with self.subTest(bad=bad), self.assertRaises(ValueError):

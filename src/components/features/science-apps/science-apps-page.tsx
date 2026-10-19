@@ -21,6 +21,7 @@ import {
   scienceAppsService,
   SCIENCE_APPS_PATH,
   SCIENCE_EXAMPLE_XYZ,
+  SCIENCE_MAGUS_EXAMPLE_XYZ,
   SCIENCE_JOB_PARAM,
   ScienceApiError,
   type ScienceApplication,
@@ -32,6 +33,7 @@ const DESCRIPTION_KEYS = {
   xtb: I18nKey.SCIENCE$XTB_DESCRIPTION,
   orca: I18nKey.SCIENCE$ORCA_DESCRIPTION,
   gaussian: I18nKey.SCIENCE$GAUSSIAN_DESCRIPTION,
+  magus: I18nKey.SCIENCE$MAGUS_DESCRIPTION,
 };
 const STATUS_KEYS: Record<ScienceJobStatus, I18nKey> = {
   queued: I18nKey.SCIENCE$QUEUED,
@@ -48,8 +50,39 @@ const ERROR_KEYS: Record<string, I18nKey> = {
   timeout: I18nKey.SCIENCE$TIMEOUT,
   service_restarted: I18nKey.SCIENCE$RESTARTED,
   calculation_failed: I18nKey.SCIENCE$CALCULATION_FAILED,
+  invalid_magus_molecule: I18nKey.SCIENCE$MAGUS_INPUT_ERROR,
+  invalid_volume: I18nKey.SCIENCE$VOLUME_ERROR,
 };
-const SCIENCE_CATEGORIES = ["all", "quantum", "semiempirical"] as const;
+const CATEGORY_KEYS = {
+  all: I18nKey.SCIENCE$ALL,
+  quantum: I18nKey.SCIENCE$QUANTUM,
+  semiempirical: I18nKey.SCIENCE$SEMIEMPIRICAL,
+  crystal: I18nKey.SCIENCE$CRYSTAL,
+};
+const SCIENCE_CATEGORIES = [
+  "all",
+  "quantum",
+  "semiempirical",
+  "crystal",
+] as const;
+const OFF23_MODEL_SIZES = ["small", "medium", "large"] as const;
+const SEARCH_FIELDS = [
+  {
+    key: "molecules_per_cell",
+    label: I18nKey.SCIENCE$MOLECULES_PER_CELL,
+    min: 1,
+    max: 8,
+  },
+  {
+    key: "population_size",
+    label: I18nKey.SCIENCE$POPULATION,
+    min: 4,
+    max: 12,
+  },
+  { key: "generations", label: I18nKey.SCIENCE$GENERATIONS, min: 1, max: 10 },
+  { key: "volume_min", label: I18nKey.SCIENCE$VOLUME_MIN, min: 30, max: 20000 },
+  { key: "volume_max", label: I18nKey.SCIENCE$VOLUME_MAX, min: 30, max: 20000 },
+] as const;
 const isActive = (status?: ScienceJobStatus) =>
   status === "queued" || status === "running";
 
@@ -132,9 +165,7 @@ interface Props {
 export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
   const { t } = useTranslation("openhands");
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<"all" | "quantum" | "semiempirical">(
-    "all",
-  );
+  const [category, setCategory] = useState<keyof typeof CATEGORY_KEYS>("all");
   const apps = useQuery({
     queryKey: SCIENCE_QUERY_KEYS.apps,
     queryFn: scienceAppsService.apps,
@@ -219,13 +250,7 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                     aria-pressed={category === value}
                     onClick={() => setCategory(value)}
                   >
-                    {t(
-                      value === "all"
-                        ? I18nKey.SCIENCE$ALL
-                        : value === "quantum"
-                          ? I18nKey.SCIENCE$QUANTUM
-                          : I18nKey.SCIENCE$SEMIEMPIRICAL,
-                    )}
+                    {t(CATEGORY_KEYS[value])}
                   </button>
                 ))}
               </div>
@@ -280,13 +305,7 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                   <h2>{app.name}</h2>
                   <p>{t(DESCRIPTION_KEYS[app.id])}</p>
                   <div className="em-science-card-tags">
-                    <span>
-                      {t(
-                        app.category === "quantum"
-                          ? I18nKey.SCIENCE$QUANTUM
-                          : I18nKey.SCIENCE$SEMIEMPIRICAL,
-                      )}
-                    </span>
+                    <span>{t(CATEGORY_KEYS[app.category])}</span>
                     <span>{t(I18nKey.SCIENCE$XYZ_INPUT)}</span>
                   </div>
                   <div className="em-science-card-footer">
@@ -349,17 +368,28 @@ function ScienceForm({
 }) {
   const { t } = useTranslation("openhands");
   const queryClient = useQueryClient();
+  const isMagus = app.id === "magus";
   const [input, setInput] = useState<ScienceJobRequest>({
     app_id: app.id,
     xyz: "",
     title: "",
-    task: "energy",
+    task: isMagus ? "search" : "energy",
     method: app.methods[0],
     basis: app.bases[0] ?? "",
     charge: 0,
     multiplicity: 1,
     cores: 2,
     memory_mb: 2048,
+    ...(isMagus
+      ? {
+          model_size: "medium" as const,
+          molecules_per_cell: 4,
+          population_size: 6,
+          generations: 3,
+          volume_min: 180,
+          volume_max: 400,
+        }
+      : {}),
   });
   const [fileName, setFileName] = useState("");
   const [fileError, setFileError] = useState(false);
@@ -397,7 +427,10 @@ function ScienceForm({
         <button
           type="button"
           onClick={() => {
-            patch("xyz", SCIENCE_EXAMPLE_XYZ);
+            patch(
+              "xyz",
+              isMagus ? SCIENCE_MAGUS_EXAMPLE_XYZ : SCIENCE_EXAMPLE_XYZ,
+            );
             setFileName("");
             setFileError(false);
           }}
@@ -452,7 +485,11 @@ function ScienceForm({
           }}
         />
       </label>
-      <p className="em-science-help">{t(I18nKey.SCIENCE$XYZ_HELP)}</p>
+      <p className="em-science-help">
+        {t(
+          isMagus ? I18nKey.SCIENCE$MAGUS_INPUT_HELP : I18nKey.SCIENCE$XYZ_HELP,
+        )}
+      </p>
       <div className="em-science-fields">
         <label>
           {t(I18nKey.SCIENCE$TASK)}
@@ -462,8 +499,16 @@ function ScienceForm({
               patch("task", event.target.value as ScienceJobRequest["task"])
             }
           >
-            <option value="energy">{t(I18nKey.SCIENCE$ENERGY)}</option>
-            <option value="optimize">{t(I18nKey.SCIENCE$OPTIMIZE)}</option>
+            {isMagus ? (
+              <option value="search">
+                {t(I18nKey.SCIENCE$CRYSTAL_SEARCH)}
+              </option>
+            ) : (
+              <>
+                <option value="energy">{t(I18nKey.SCIENCE$ENERGY)}</option>
+                <option value="optimize">{t(I18nKey.SCIENCE$OPTIMIZE)}</option>
+              </>
+            )}
           </select>
         </label>
         <label>
@@ -491,30 +536,73 @@ function ScienceForm({
             </select>
           </label>
         )}
-        <label>
-          {t(I18nKey.SCIENCE$CHARGE)}
-          <input
-            type="number"
-            min={-10}
-            max={10}
-            required
-            value={input.charge}
-            onChange={(event) => patch("charge", Number(event.target.value))}
-          />
-        </label>
-        <label>
-          {t(I18nKey.SCIENCE$MULTIPLICITY)}
-          <input
-            type="number"
-            min={1}
-            max={5}
-            required
-            value={input.multiplicity}
-            onChange={(event) =>
-              patch("multiplicity", Number(event.target.value))
-            }
-          />
-        </label>
+        {isMagus && (
+          <>
+            <label>
+              {t(I18nKey.SCIENCE$MODEL_SIZE)}
+              <select
+                value={input.model_size}
+                onChange={(event) =>
+                  patch(
+                    "model_size",
+                    event.target.value as ScienceJobRequest["model_size"],
+                  )
+                }
+              >
+                {OFF23_MODEL_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {SEARCH_FIELDS.map((field) => (
+              <label key={field.key}>
+                {t(field.label)}
+                <input
+                  type="number"
+                  required
+                  min={field.min}
+                  max={field.max}
+                  value={input[field.key]}
+                  onChange={(event) =>
+                    patch(field.key, Number(event.target.value))
+                  }
+                />
+              </label>
+            ))}
+          </>
+        )}
+        {!isMagus && (
+          <>
+            <label>
+              {t(I18nKey.SCIENCE$CHARGE)}
+              <input
+                type="number"
+                min={-10}
+                max={10}
+                required
+                value={input.charge}
+                onChange={(event) =>
+                  patch("charge", Number(event.target.value))
+                }
+              />
+            </label>
+            <label>
+              {t(I18nKey.SCIENCE$MULTIPLICITY)}
+              <input
+                type="number"
+                min={1}
+                max={5}
+                required
+                value={input.multiplicity}
+                onChange={(event) =>
+                  patch("multiplicity", Number(event.target.value))
+                }
+              />
+            </label>
+          </>
+        )}
         <label>
           {t(I18nKey.SCIENCE$CORES)}
           <input
@@ -657,6 +745,21 @@ function JobResult({ jobId }: { jobId: string | null }) {
                 })}
               </strong>
             </div>
+          )}
+          {job.energy_ev != null && (
+            <div className="em-science-energy">
+              <span>{t(I18nKey.SCIENCE$LOWEST_ENERGY)}</span>
+              <strong>
+                {t(I18nKey.SCIENCE$ENERGY_EV_VALUE, {
+                  value: job.energy_ev.toFixed(8),
+                })}
+              </strong>
+            </div>
+          )}
+          {job.app_id === "magus" && job.status === "succeeded" && (
+            <p className="em-science-help">
+              {t(I18nKey.SCIENCE$MAGUS_RESULT_NOTE)}
+            </p>
           )}
           <h3>{t(I18nKey.SCIENCE$LOG)}</h3>
           <textarea

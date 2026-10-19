@@ -1,6 +1,6 @@
 # EM-Agent 科学应用
 
-入口：侧栏 **科学应用** → xTB / ORCA / Gaussian。用户上传或粘贴标准 XYZ，选择单点能/几何优化、方法、自旋、电荷和资源，提交后查看状态、日志并下载输入与输出。任务与 Agent 对话独立，不产生模型调用。
+入口：侧栏 **科学应用** → xTB / ORCA / Gaussian / MAGUS。用户上传或粘贴标准 XYZ，配置参数，提交后查看状态、日志并下载输入与输出。手动页面与 Agent 对话独立，不产生模型调用。
 
 ## 运行与数据
 
@@ -19,6 +19,38 @@ Node 24 + 已锁定的 npm 依赖。科学服务使用镜像已有的 FastAPI 0.
 ```sh
 uv run --python 3.13 --with fastapi==0.143.0 --with uvicorn==0.54.0 \
   python -m uvicorn tools.science_apps.service:app --host 127.0.0.1 --port 18002
+```
+
+## MAGUS + MACE-OFF23
+
+MAGUS 2.2.0 的首个工作流是单组分、中性闭壳层有机分子晶体预测。输入是**一个连通分子**的 XYZ，
+支持 H/C/N/O/F/P/S/Cl/Br/I。设置晶胞内分子数（1–8）、种群（4–12）、代数（1–10）、
+整个晶胞的体积范围（Å³）和 small/medium/large 模型；晶胞总计不超过 128 原子。
+默认四个甲烷、6 个体、3 代、180–400 Å³，其他分子的体积须相应调整。零压力、CPU float64、
+固定 BFGS 晶格优化（0.05 eV/Å，最多 200 步）。15 分钟仍未结束会超时失败。
+
+`magus_runner.py` 在隔离 Python 中生成原生 MAGUS 输入并运行。保留结构须通过分子完整性、
+能量/力/应力重算一致性检查，且至少一个候选收敛，才返回成功。能量单位为整个晶胞的 eV；
+`result.json` 记录每个候选的收敛状态，最低能量候选仍须查该字段。输出提供各候选 CIF/POSCAR、
+`results.zip`（含原生输入、日志和轨迹）。有限搜索不能保证全局最低点，也不等同于 DFT 精度。
+MAGUS 2.2 的 `add_sym` 会原地改变父代坐标并留下旧能量，因此固定为 false。
+
+运行时挂载见部署文档。独立 uv 环境安装 MAGUS/gensym 的 CPython 3.10 扩展及 MACE，
+不改原 MAGUS 环境或共享 Python 3.12 MACE 环境，也不复制模型权重。
+可用性检测检查 `magus-mace`、运行时 Python 和三份本地权重；不在目录请求时下载模型。
+
+Agent 使用镜像提供的 `em-magus` CLI，经同一个 `/api/science` 服务提交和管理任务，
+因此与手动页面共用串行队列和历史。CLI 从运行时环境读取 session key，不打印密钥。
+镜像启动时在不存在同名用户技能的情况下，链接自带的 `magus` 技能到
+`~/.openhands/skills/magus`。新对话自动发现；已有对话需要新建对话才能加载新技能。
+不需要扩展 SDK 工具协议、MCP 或重写 Agent 编排。
+
+```sh
+em-magus submit molecule.xyz --molecules-per-cell 4 --population-size 6 --generations 3 \
+  --volume-min 180 --volume-max 400 --model-size medium --cores 2
+em-magus status JOB_ID
+em-magus cancel JOB_ID
+em-magus download JOB_ID ./magus-results
 ```
 
 运行前在私有环境设置 `SCIENCE_SESSION_API_KEY`，可用 `SCIENCE_APPS_DATA_DIR` 指定独立测试数据目录。服务只应绑定 loopback。若本地前端需要单独预览，请让现有静态服务增加 `--route /api/science=http://127.0.0.1:18002`，前端继续使用相同运行时 session key。标准上游 `npm run dev` 不自动启动科学服务。

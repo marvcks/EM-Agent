@@ -7,7 +7,10 @@ const SCIENCE_API_PREFIX = "/api/science";
 export const SCIENCE_JOB_PARAM = "job";
 export const SCIENCE_EXAMPLE_XYZ =
   "3\nWater\nO 0 0 0\nH 0.7586 0 0.5043\nH -0.7586 0 0.5043\n";
-export type ScienceAppId = "xtb" | "orca" | "gaussian";
+export const SCIENCE_MAGUS_EXAMPLE_XYZ =
+  "5\nMethane\nC 0 0 0\nH 0.63 0.63 0.63\nH -0.63 -0.63 0.63\nH -0.63 0.63 -0.63\nH 0.63 -0.63 -0.63\n";
+export const SCIENCE_APP_IDS = ["xtb", "orca", "gaussian", "magus"] as const;
+export type ScienceAppId = (typeof SCIENCE_APP_IDS)[number];
 export type ScienceJobStatus =
   | "queued"
   | "running"
@@ -17,7 +20,7 @@ export type ScienceJobStatus =
 export interface ScienceApplication {
   id: ScienceAppId;
   name: string;
-  category: "semiempirical" | "quantum";
+  category: "semiempirical" | "quantum" | "crystal";
   available: boolean;
   methods: string[];
   bases: string[];
@@ -29,13 +32,19 @@ export interface ScienceJobRequest {
   app_id: ScienceAppId;
   xyz: string;
   title: string;
-  task: "energy" | "optimize";
+  task: "energy" | "optimize" | "search";
   method: string;
   basis: string;
   charge: number;
   multiplicity: number;
   cores: number;
   memory_mb: number;
+  model_size?: "small" | "medium" | "large";
+  molecules_per_cell?: number;
+  population_size?: number;
+  generations?: number;
+  volume_min?: number;
+  volume_max?: number;
 }
 export interface ScienceJob {
   id: string;
@@ -47,6 +56,7 @@ export interface ScienceJob {
   finished_at: string | null;
   error: string | null;
   energy_hartree: number | null;
+  energy_ev?: number | null;
   exit_code: number | null;
 }
 export interface ScienceJobDetail extends ScienceJob {

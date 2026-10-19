@@ -19,6 +19,10 @@ STATE_DIRS = {
     'browser-config': '/home/openhands/.config',
     'editor-state': '/home/openhands/.openvscode-server',
 }
+SCIENCE_MOUNTS = {
+    '/opt/em-agent-tools/magus': '/opt/em-agent-tools/magus',
+    '/root/EM-Agent-Tools/mace-off23/models': '/opt/em-agent-tools/mace-off23/models',
+}
 PROBE = '''
 import json, os, urllib.request, urllib.parse
 headers = {'X-Session-API-Key': os.environ['LOCAL_BACKEND_API_KEY']}
@@ -60,7 +64,7 @@ def run(*args, input=None):
     return result.stdout
 
 
-def render_compose(original, image_id, remove_frontend=True):
+def render_compose(original, image_id, remove_frontend=True, science_tools=False):
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id):
         raise ValueError('Expected an immutable local image ID')
     if len(re.findall(r'^    image:.*$', original, flags=re.M)) != 1:
@@ -77,6 +81,13 @@ def render_compose(original, image_id, remove_frontend=True):
             if destination in result:
                 raise ValueError(f'Another mount owns {destination}')
             additions.append(line)
+    if science_tools:
+        for source, destination in SCIENCE_MOUNTS.items():
+            line = f'      - {source}:{destination}:ro\n'
+            if line not in result:
+                if destination in result:
+                    raise ValueError(f'Another mount owns {destination}')
+                additions.append(line)
     return result.replace('    volumes:\n', '    volumes:\n' + ''.join(additions))
 
 
@@ -158,7 +169,13 @@ def deploy(root, image, commit):
     compose = root / 'compose.yaml'
     original = compose.read_text()
     (release / 'compose-original.yaml').write_text(original)
-    candidate = render_compose(original, info['Id'])
+    science_tools = labels.get('io.em-agent.magus') == '1'
+    if science_tools:
+        runtime = Path('/opt/em-agent-tools/magus/mace-runner/.venv/bin/python')
+        models = Path('/root/EM-Agent-Tools/mace-off23/models')
+        if not runtime.is_file() or not all((models / f'MACE-OFF23_{size}.model').is_file() for size in ('small', 'medium', 'large')):
+            raise RuntimeError('Prepare the isolated MAGUS runtime and shared MACE-OFF23 models before deploying')
+    candidate = render_compose(original, info['Id'], science_tools=science_tools)
     fallback = render_compose(original, previous['Image'], remove_frontend=False)
     atomic_write(release / 'compose-candidate.yaml', candidate)
     atomic_write(release / 'compose-rollback.yaml', fallback)

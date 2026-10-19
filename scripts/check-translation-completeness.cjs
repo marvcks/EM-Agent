@@ -14,6 +14,7 @@ const path = require('path');
 // only when the English value is genuinely correct for all languages.
 const IDENTICAL_VALUE_ALLOWLIST = new Set([
   'SCIENCE$ENERGY_VALUE',
+  'SCIENCE$ENERGY_EV_VALUE',
   'SCIENCE$FILE_SIZE',
   'BRANDING$EM_NAME',
   'BRANDING$EM_EYEBROW',
