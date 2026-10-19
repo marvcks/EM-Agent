@@ -1,0 +1,365 @@
+"""EM-Agent's single-server manual scientific jobs; independent of Agent Server.
+
+Run: SCIENCE_SESSION_API_KEY=... python -m uvicorn tools.science_apps.service:app
+No LLM calls. Inputs are generated from bounded XYZ/enum parameters, never shell.
+"""
+import asyncio
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+import hmac
+import json
+import math
+import os
+from pathlib import Path
+import re
+import shutil
+import signal
+import time
+from typing import Literal
+from uuid import uuid4
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+
+PREFIX = '/api/science'
+MAX_LOG_BYTES = 10 * 1024 * 1024
+TIMEOUT_SECONDS = 900
+ACTIVE = {'queued', 'running'}
+ELEMENTS = ('H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og').split()
+APPLICATIONS = {
+    'xtb': {'name': 'xTB', 'executable': 'xtb', 'methods': ['GFN2-xTB', 'GFN1-xTB'], 'bases': [], 'category': 'semiempirical'},
+    'orca': {'name': 'ORCA', 'executable': 'orca', 'methods': ['r2SCAN-3c', 'HF', 'B3LYP'], 'bases': ['def2-SVP', 'def2-TZVP'], 'category': 'quantum'},
+    'gaussian': {'name': 'Gaussian', 'executable': 'g16', 'methods': ['HF', 'B3LYP', 'PBE1PBE'], 'bases': ['STO-3G', '6-31G(d)', 'def2SVP'], 'category': 'quantum'},
+}
+
+
+class JobRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    app_id: Literal['xtb', 'orca', 'gaussian']
+    xyz: str = Field(min_length=5, max_length=65536)
+    title: str = Field(default='', max_length=80)
+    task: Literal['energy', 'optimize'] = 'energy'
+    method: str = ''
+    basis: str = ''
+    charge: int = Field(default=0, ge=-10, le=10)
+    multiplicity: int = Field(default=1, ge=1, le=5)
+    cores: int = Field(default=2, ge=1, le=8)
+    memory_mb: int = Field(default=2048, ge=512, le=8192)
+
+
+def now():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def parse_xyz(text, charge, multiplicity):
+    lines = text.strip().splitlines()
+    try:
+        count = int(lines[0])
+    except (ValueError, IndexError):
+        raise ValueError('invalid_xyz') from None
+    if not 1 <= count <= 128 or len(lines) != count + 2:
+        raise ValueError('invalid_xyz')
+    atoms = []
+    electrons = -charge
+    for line in lines[2:]:
+        parts = line.split()
+        if len(parts) != 4 or parts[0] not in ELEMENTS:
+            raise ValueError('invalid_xyz')
+        try:
+            coords = [float(value) for value in parts[1:]]
+        except ValueError:
+            raise ValueError('invalid_xyz') from None
+        if not all(math.isfinite(value) and abs(value) <= 10000 for value in coords):
+            raise ValueError('invalid_xyz')
+        electrons += ELEMENTS.index(parts[0]) + 1
+        atoms.append(parts[0] + ' ' + ' '.join(f'{value:.10f}' for value in coords))
+    if electrons < multiplicity - 1 or (electrons - (multiplicity - 1)) % 2:
+        raise ValueError('invalid_spin')
+    return atoms
+
+
+def prepare_input(request):
+    config = APPLICATIONS[request.app_id]
+    method = request.method or config['methods'][0]
+    basis = request.basis or (config['bases'][0] if config['bases'] else '')
+    if method not in config['methods'] or (basis and basis not in config['bases']):
+        raise ValueError('invalid_method')
+    atoms = parse_xyz(request.xyz, request.charge, request.multiplicity)
+    xyz = f'{len(atoms)}\nEM-Agent manual calculation\n' + '\n'.join(atoms) + '\n'
+    geometry = '\n'.join(atoms)
+    if request.app_id == 'xtb':
+        args = ['input.xyz', '--gfn', '2' if method == 'GFN2-xTB' else '1', '--chrg', str(request.charge), '--uhf', str(request.multiplicity - 1), '--parallel', str(request.cores)]
+        if request.task == 'optimize':
+            args.append('--opt')
+        return 'input.xyz', xyz, args
+    if request.app_id == 'orca':
+        theory = method if method == 'r2SCAN-3c' else f'{method} {basis}'
+        task = 'SP' if request.task == 'energy' else 'Opt'
+        content = (f'! {theory} {task}\n%pal nprocs {request.cores} end\n'
+                   f'%maxcore {request.memory_mb // request.cores}\n'
+                   f'* xyz {request.charge} {request.multiplicity}\n{geometry}\n*\n')
+        return 'input.inp', content, ['input.inp']
+    task = 'SP' if request.task == 'energy' else 'Opt'
+    content = (f'%chk=calculation.chk\n%nprocshared={request.cores}\n%mem={request.memory_mb}MB\n'
+               f'#p {method}/{basis} {task}\n\nEM-Agent manual calculation\n\n'
+               f'{request.charge} {request.multiplicity}\n{geometry}\n\n')
+    return 'input.gjf', content, []
+
+
+class Manager:
+    def __init__(self, root):
+        self.root = root
+        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.jobs = {}
+        self.queue = asyncio.Queue()
+        self.process = None
+        self.running_id = None
+        for metadata in sorted(root.glob('*/job.json')):
+            try:
+                job = json.loads(metadata.read_text())
+                if metadata.parent.name != job['id'] or not re.fullmatch(r'[a-f0-9]{32}', job['id']):
+                    continue
+                self.jobs[job['id']] = job
+                if job['status'] in ACTIVE:
+                    job.update(status='failed', error='service_restarted', finished_at=now())
+                    self.save(job)
+            except (ValueError, KeyError, OSError):
+                continue
+
+    def directory(self, job_id):
+        if not re.fullmatch(r'[a-f0-9]{32}', job_id):
+            raise FileNotFoundError
+        return self.root / job_id
+
+    def save(self, job):
+        temporary = self.directory(job['id']) / 'job.json.next'
+        temporary.write_text(json.dumps(job, ensure_ascii=False, indent=2))
+        temporary.replace(temporary.with_name('job.json'))
+
+    def submit(self, request):
+        if sum(job['status'] in ACTIVE for job in self.jobs.values()) >= 10:
+            raise HTTPException(429, 'queue_full')
+        name, content, _ = prepare_input(request)
+        executable = shutil.which(APPLICATIONS[request.app_id]['executable'])
+        if not executable:
+            raise HTTPException(409, 'app_unavailable')
+        job_id = uuid4().hex
+        directory = self.directory(job_id)
+        directory.mkdir(mode=0o700)
+        (directory / name).write_text(content)
+        (directory / 'structure.xyz').write_text(request.xyz)
+        job = {'id': job_id, 'app_id': request.app_id, 'title': request.title.strip() or APPLICATIONS[request.app_id]['name'],
+               'status': 'queued', 'created_at': now(), 'started_at': None, 'finished_at': None,
+               'error': None, 'energy_hartree': None, 'exit_code': None, 'request': request.model_dump()}
+        self.jobs[job_id] = job
+        self.save(job)
+        self.queue.put_nowait(job_id)
+        return job
+
+    def get(self, job_id):
+        self.directory(job_id)
+        if job_id not in self.jobs:
+            raise FileNotFoundError
+        return self.jobs[job_id]
+
+    def file(self, job_id, name):
+        self.get(job_id)
+        if Path(name).name != name or name in {'job.json', 'job.json.next'}:
+            raise FileNotFoundError
+        file = self.directory(job_id) / name
+        if file.is_symlink() or not file.is_file() or file.resolve().parent != self.directory(job_id).resolve():
+            raise FileNotFoundError
+        return file
+
+    def detail(self, job_id):
+        job = dict(self.get(job_id))
+        directory = self.directory(job_id)
+        log = directory / 'output.log'
+        if log.is_file():
+            with log.open('rb') as stream:
+                stream.seek(max(0, log.stat().st_size - 64000))
+                job['log'] = stream.read(64000).decode('utf-8', errors='replace')
+        else:
+            job['log'] = ''
+        job['files'] = []
+        for path in sorted(directory.iterdir()):
+            try:
+                safe = self.file(job_id, path.name)
+                job['files'].append({'name': path.name, 'size': safe.stat().st_size})
+            except FileNotFoundError:
+                continue
+        return job
+
+    async def terminate(self):
+        if self.process is None:
+            return
+        process = self.process
+        try:
+            # The program may leave MPI/worker descendants after its leader exits.
+            os.killpg(process.pid, signal.SIGTERM)
+            await asyncio.sleep(0.15)
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            await process.wait()
+        except ProcessLookupError:
+            pass
+
+    async def cancel(self, job_id):
+        job = self.get(job_id)
+        if job['status'] in ACTIVE:
+            job.update(status='cancelled', finished_at=now())
+            self.save(job)
+            if self.running_id == job_id:
+                await self.terminate()
+        return self.detail(job_id)
+
+    async def run(self, job_id):
+        job = self.get(job_id)
+        if job['status'] != 'queued':
+            return
+        job.update(status='running', started_at=now())
+        self.save(job)
+        self.running_id = job_id
+        directory = self.directory(job_id)
+        request = JobRequest(**job['request'])
+        name, _, args = prepare_input(request)
+        executable = shutil.which(APPLICATIONS[request.app_id]['executable'])
+        scratch = directory / 'scratch'
+        scratch.mkdir(exist_ok=True)
+        environment = {**os.environ, 'OMP_NUM_THREADS': str(request.cores), 'OPENBLAS_NUM_THREADS': str(request.cores),
+                       'GAUSS_SCRDIR': str(scratch.resolve()), 'TMPDIR': str(scratch.resolve())}
+        log_path = directory / 'output.log'
+        try:
+            if not executable:
+                raise FileNotFoundError('app_unavailable')
+            with log_path.open('wb') as output, (directory / name).open('rb') as input_file:
+                self.process = await asyncio.create_subprocess_exec(executable, *args, cwd=directory,
+                    env=environment, stdin=input_file if request.app_id == 'gaussian' else asyncio.subprocess.DEVNULL,
+                    stdout=output, stderr=asyncio.subprocess.STDOUT, start_new_session=True)
+                if job['status'] == 'cancelled':
+                    await self.terminate()
+                started = time.monotonic()
+                waiter = asyncio.create_task(self.process.wait())
+                while self.process.returncode is None:
+                    if time.monotonic() - started > TIMEOUT_SECONDS or log_path.stat().st_size > MAX_LOG_BYTES:
+                        job['error'] = 'timeout' if time.monotonic() - started > TIMEOUT_SECONDS else 'output_limit'
+                        await self.terminate()
+                        break
+                    try:
+                        await asyncio.wait_for(asyncio.shield(waiter), timeout=0.5)
+                    except TimeoutError:
+                        continue
+                job['exit_code'] = await self.process.wait()
+            text = log_path.read_text(errors='replace')
+            markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian'}
+            if job['status'] != 'cancelled':
+                success = job['exit_code'] == 0 and markers[job['app_id']].lower() in text.lower() and not job['error']
+                job['status'] = 'succeeded' if success else 'failed'
+                if not success and not job['error']:
+                    job['error'] = 'calculation_failed'
+                patterns = {'xtb': r'TOTAL ENERGY\s+(-?[\d.]+)', 'orca': r'FINAL SINGLE POINT ENERGY\s+(-?[\d.]+)',
+                            'gaussian': r'SCF Done:.*?=\s*(-?[\d.]+)'}
+                energies = re.findall(patterns[job['app_id']], text)
+                if success and energies:
+                    job['energy_hartree'] = float(energies[-1])
+        except Exception:
+            if job['status'] != 'cancelled':
+                job.update(status='failed', error='execution_error')
+        finally:
+            await self.terminate()
+            self.process = None
+            self.running_id = None
+            job['finished_at'] = now()
+            self.save(job)
+            shutil.rmtree(scratch, ignore_errors=True)
+
+    async def worker(self):
+        while True:
+            job_id = await self.queue.get()
+            try:
+                await self.run(job_id)
+            finally:
+                self.queue.task_done()
+
+
+def create_app(root=None, key=None):
+    @asynccontextmanager
+    async def lifespan(app):
+        session_key = key if key is not None else os.environ.get('SCIENCE_SESSION_API_KEY', '')
+        if not session_key:
+            raise RuntimeError('SCIENCE_SESSION_API_KEY is required')
+        app.state.session_key = session_key
+        app.state.manager = Manager(root or Path(os.environ.get('SCIENCE_APPS_DATA_DIR', str(Path.home() / '.openhands' / 'science-apps'))))
+        worker = asyncio.create_task(app.state.manager.worker())
+        try:
+            yield
+        finally:
+            manager = app.state.manager
+            if manager.running_id:
+                await manager.cancel(manager.running_id)
+            worker.cancel()
+            try:
+                await worker
+            except asyncio.CancelledError:
+                pass
+
+    app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+
+    @app.middleware('http')
+    async def authenticate(request: Request, call_next):
+        supplied = request.headers.get('X-Session-API-Key', '')
+        if not hmac.compare_digest(supplied.encode(), app.state.session_key.encode()):
+            return JSONResponse({'detail': 'unauthorized'}, status_code=401)
+        if request.method == 'POST':
+            if int(request.headers.get('content-length', '0')) > 131072:
+                return JSONResponse({'detail': 'input_too_large'}, status_code=413)
+            if len(await request.body()) > 131072:
+                return JSONResponse({'detail': 'input_too_large'}, status_code=413)
+        response = await call_next(request)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.exception_handler(FileNotFoundError)
+    async def not_found(request, exc):
+        return JSONResponse({'detail': 'not_found'}, status_code=404)
+
+    @app.get(PREFIX + '/health')
+    async def health():
+        return {'status': 'ok'}
+
+    @app.get(PREFIX + '/apps')
+    async def apps():
+        return [{'id': app_id, **{k: v for k, v in config.items() if k != 'executable'},
+                 'available': shutil.which(config['executable']) is not None,
+                 'max_cores': 8, 'max_memory_mb': 8192, 'timeout_seconds': TIMEOUT_SECONDS} for app_id, config in APPLICATIONS.items()]
+
+    @app.get(PREFIX + '/jobs')
+    async def jobs():
+        return [{k: v for k, v in job.items() if k != 'request'} for job in sorted(app.state.manager.jobs.values(), key=lambda item: item['created_at'], reverse=True)[:100]]
+
+    @app.post(PREFIX + '/jobs', status_code=201)
+    async def submit(request: JobRequest):
+        try:
+            return app.state.manager.submit(request)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.get(PREFIX + '/jobs/{job_id}')
+    async def detail(job_id: str):
+        return app.state.manager.detail(job_id)
+
+    @app.post(PREFIX + '/jobs/{job_id}/cancel')
+    async def cancel(job_id: str):
+        return await app.state.manager.cancel(job_id)
+
+    @app.get(PREFIX + '/jobs/{job_id}/files/{name}')
+    async def download(job_id: str, name: str):
+        return FileResponse(app.state.manager.file(job_id, name), filename=name, media_type='application/octet-stream')
+
+    return app
+
+
+app = create_app()

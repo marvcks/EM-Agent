@@ -381,6 +381,19 @@ wait_for_port "$AUTOMATION_PORT" "Automation Server" 60 &
 WAIT_PID2=$!
 wait "$WAIT_PID1" "$WAIT_PID2"
 
+# EM-Agent's manual science service is opt-in; SDK/automation contracts stay intact.
+SCIENCE_ROUTE_ARGS=()
+if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ]; then
+  SCIENCE_APPS_PORT="${SCIENCE_APPS_PORT:-18002}"
+  log "Starting manual scientific applications on port $SCIENCE_APPS_PORT..."
+  SCIENCE_SESSION_API_KEY="$EFFECTIVE_SESSION_KEY" \
+    python -m uvicorn science_apps.service:app --app-dir /opt/agent-canvas \
+      --host 127.0.0.1 --port "$SCIENCE_APPS_PORT" --no-access-log &
+  PIDS+=("$!")
+  wait_for_port "$SCIENCE_APPS_PORT" "Scientific applications" 30 || exit 1
+  SCIENCE_ROUTE_ARGS+=(--route "/api/science=http://127.0.0.1:${SCIENCE_APPS_PORT}")
+fi
+
 # ── 4. Start static server (frontend + proxy) ────────────────────────────────
 log "Starting frontend + proxy on port $PORT..."
 
@@ -423,6 +436,7 @@ node /opt/agent-canvas/static-server.mjs \
   --base-path "$AGENT_CANVAS_BASE_PATH" \
   --session-api-key "$EFFECTIVE_SESSION_KEY" \
   --runtime-services-info "$RUNTIME_SERVICES_INFO" \
+  "${SCIENCE_ROUTE_ARGS[@]}" \
   --route "/api/automation=http://127.0.0.1:${AUTOMATION_PORT}" \
   --route "/api=http://127.0.0.1:${AGENT_SERVER_PORT}" \
   --route "/server_info=http://127.0.0.1:${AGENT_SERVER_PORT}" \
@@ -475,6 +489,7 @@ if [ -n "${PUBLIC_MODE_PORT:-}" ]; then
     --base-path "$AGENT_CANVAS_BASE_PATH" \
     --auth-required \
     --runtime-services-info "$RUNTIME_SERVICES_INFO" \
+    "${SCIENCE_ROUTE_ARGS[@]}" \
     --route "/api/automation=http://127.0.0.1:${AUTOMATION_PORT}" \
     --route "/api=http://127.0.0.1:${AGENT_SERVER_PORT}" \
     --route "/server_info=http://127.0.0.1:${AGENT_SERVER_PORT}" \

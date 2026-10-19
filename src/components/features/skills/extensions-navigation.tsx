@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Blocks, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { CompactSectionNavigation } from "#/components/shared/compact-section-navigation";
 import { useNavigation } from "#/context/navigation-context";
 import { NavigationLink } from "#/components/shared/navigation-link";
@@ -62,12 +62,6 @@ export const EXTENSIONS_NAV_ITEMS: ExtensionNavItem[] = [
         <path d="M12 22V12" />
       </svg>
     ),
-    end: true,
-  },
-  {
-    to: "/apps",
-    label: "Apps",
-    icon: <Blocks width={16} height={16} aria-hidden="true" />,
     end: true,
   },
 ];

@@ -13,9 +13,10 @@ ghcr.io/openhands/agent-canvas:1.27.1@sha256:6f54e27c47c8073d402391495fa869afca8
 ```
 
 构建阶段使用该镜像内的 Node.js、`package-lock.json` 和提交中的源码，运行
-翻译、类型和生产构建检查。最终镜像只替换前端，并附带
-`/opt/em-agent/release.json`。Agent Server 1.54.0、Automation 1.19.3 及
-原有入口脚本沿用该运行环境。升级后端基线时需要另行检查兼容性。
+翻译、类型和生产构建检查。最终镜像替换前端，附带科学应用独立服务、
+启动它的入口脚本及 `/opt/em-agent/release.json`。Agent Server 1.54.0、
+Automation 1.19.3 沿用该运行环境。科学服务复用固定镜像内的 FastAPI /
+uvicorn；不升级 OpenHands 后端。升级后端基线时需要另行检查兼容性。
 
 镜像的 `org.opencontainers.image.source` 标签指向这个 fork，
 `org.opencontainers.image.revision` 标签记录完整提交号。依赖目录、未提交
@@ -53,7 +54,8 @@ python3 scripts/em-agent/deploy-image.py deploy \
 ```
 
 脚本验证镜像来源与提交标签、Compose 配置和会话状态。存在运行中的会话时
-会停止部署，等待会话结束后重试。切换需要短暂停止并重建应用容器。
+会停止部署，等待会话结束后重试；已启用科学应用的镜像还会检查科学任务
+是否排队/运行，避免更新打断计算。切换需要短暂停止并重建应用容器。
 
 首次切换时，脚本将旧容器中的以下目录复制到宿主机，并添加持久化挂载：
 
@@ -68,7 +70,7 @@ python3 scripts/em-agent/deploy-image.py deploy \
 宿主机用于回滚。密钥继续从服务器的 `runtime.env` 与持久化数据读取。
 
 停止旧容器后，脚本备份数据与 Compose，按原路径挂载会话文件，再启动新
-镜像。新容器必须通过健康检查、历史会话 ID 检查和原工作目录文件的 SHA-256
+镜像。新容器必须通过健康检查、科学服务鉴权健康检查（启用时）、历史会话 ID 检查和原工作目录文件的 SHA-256
 校验；失败时自动恢复上一镜像及持久化挂载。
 
 部署记录保存在：

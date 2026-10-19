@@ -82,3 +82,10 @@ git switch -c codex/upgrade-openhands
 [镜像构建、部署和回滚](em-agent-deployment.md)。当前方案沿用固定摘要的
 1.27.1 后端运行镜像，在镜像内构建并替换前端。服务器凭据、数据库和项目
 文件保存在宿主机，不属于源码或镜像构建上下文。
+
+## 科学应用与产品范围
+
+科学应用已添加在 `/science-apps`，提供独立于 Agent 的手动 xTB、ORCA 和
+Gaussian 任务。界面隐藏第三方 Apps 管理与原生 Git 账户连接，保留 MCP、
+Skills、插件和 Agent 工作区。详细运行方式、限制与扩展步骤见
+[科学应用说明](em-agent-science-apps.md)；后续开发先读根目录 `AGENTS.md`。

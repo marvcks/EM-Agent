@@ -1,6 +1,8 @@
+import { SCIENCE_APPS_PATH } from "#/api/science-apps-service";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
+  FlaskConical,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -42,8 +44,6 @@ import {
   sidebarNavListClassName,
   sidebarNavRowClassName,
 } from "./sidebar-layout";
-import { useCanvasExtensionsRuntime } from "#/components/features/canvas-extensions/canvas-extensions-runtime";
-import { CanvasExtensionIcon } from "#/components/features/canvas-extensions/canvas-extension-icon";
 import type { Backend } from "#/api/backend-registry/types";
 
 const ICON_SIZE = 18;
@@ -96,7 +96,6 @@ export function SidebarRailBody({
   onOpenManageBackends,
 }: SidebarRailBodyProps) {
   const { t } = useTranslation("openhands");
-  const { pages: canvasExtensionPages } = useCanvasExtensionsRuntime();
   const backendCloseTimerRef = collapsedBackendCloseTimer;
   const { isPinnedRoute, togglePinnedRoute } = usePinnedHomeRoute();
 
@@ -216,6 +215,13 @@ export function SidebarRailBody({
         )}
         <CommandMenuTrigger collapsed={collapsed} />
         <SidebarNavLink
+          to={SCIENCE_APPS_PATH}
+          label={t(I18nKey.SCIENCE$TITLE)}
+          testId="sidebar-science-apps-link"
+          collapsed={collapsed}
+          icon={<FlaskConical width={ICON_SIZE} height={ICON_SIZE} />}
+        />
+        <SidebarNavLink
           to={CUSTOMIZE_PATH}
           label={t(I18nKey.NAV$CUSTOMIZE)}
           testId="sidebar-skills-link"
@@ -268,21 +274,6 @@ export function SidebarRailBody({
             )}
           />
         )}
-        {canvasExtensionPages.map((page) => (
-          <SidebarNavLink
-            key={`${page.extension.name}:${page.contribution.id}`}
-            to={page.href}
-            label={page.contribution.nav_label || page.contribution.title}
-            testId={`sidebar-canvas-extension-${page.extension.name}-${page.contribution.id}`}
-            collapsed={collapsed}
-            icon={
-              <CanvasExtensionIcon
-                extension={page.extension}
-                size={ICON_SIZE}
-              />
-            }
-          />
-        ))}
       </nav>
 
       <SidebarConversationList collapsed={collapsed} />

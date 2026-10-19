@@ -30,6 +30,11 @@ while True:
     items.extend({'id': x['id'], 'status': x.get('execution_status')} for x in result.get('items', []))
     page = result.get('next_page_id')
     if not page: break
+if os.environ.get('EM_AGENT_SCIENCE_APPS') == '1':
+    request = urllib.request.Request('http://127.0.0.1:8000/api/science/jobs', headers=headers)
+    science_jobs = json.load(urllib.request.urlopen(request, timeout=15))
+    if any(job['status'] in {'queued', 'running'} for job in science_jobs):
+        raise RuntimeError('Scientific calculations are active; retry when idle')
 print(json.dumps(items))
 '''
 VERIFY_FILES = '''
@@ -182,6 +187,12 @@ def deploy(root, image, commit):
         switched = True
         compose_run('up', '-d', '--no-deps', '--force-recreate', '--pull', 'never', 'canvas')
         wait_healthy()
+        run('docker', 'exec', 'openhands', 'python', '-c', """
+import json, os, urllib.request
+if os.environ.get('EM_AGENT_SCIENCE_APPS') == '1':
+    request = urllib.request.Request('http://127.0.0.1:8000/api/science/health', headers={'X-Session-API-Key': os.environ['LOCAL_BACKEND_API_KEY']})
+    assert json.load(urllib.request.urlopen(request, timeout=15))['status'] == 'ok'
+""")
         restored = verify_restored(conversations, manifest)
         record = {
             'source': SOURCE, 'revision': commit, 'image_tag': image, 'image_id': info['Id'],

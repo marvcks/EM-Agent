@@ -5,6 +5,7 @@ import { join, relative } from "node:path";
 const SRC_ROOT = join(process.cwd(), "src");
 const EXCLUDED_SEGMENTS = new Set(["mocks", "routeTree.gen.ts"]);
 const ALLOWED_AD_HOC_HTTP_FILES = new Set([
+  "api/science-apps-service.ts", // Separate EM-Agent service, never Agent Server.
   "api/automation-service/automation-service.api.ts",
   "api/cloud/proxy.ts",
   "api/main-app-auth.ts",

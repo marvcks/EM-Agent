@@ -53,14 +53,13 @@ describe("ExtensionsMobileHub", () => {
     expect(pluginsItem).not.toHaveAttribute("aria-disabled");
   });
 
-  it("links Apps to its management page", () => {
+  it("hides third-party Apps connections", () => {
     renderMobileHub(<ExtensionsMobileHub />);
 
     const hub = screen.getByTestId("extensions-mobile-hub");
-    expect(within(hub).getByTestId("sidebar-extensions-/apps")).toHaveAttribute(
-      "href",
-      "/apps",
-    );
+    expect(
+      within(hub).queryByTestId("sidebar-extensions-/apps"),
+    ).not.toBeInTheDocument();
   });
 
   describe("cloud backend", () => {

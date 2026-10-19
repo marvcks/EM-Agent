@@ -13,6 +13,8 @@ const path = require('path');
 // protocol/technical terms, placeholder-only format strings). Add a key here
 // only when the English value is genuinely correct for all languages.
 const IDENTICAL_VALUE_ALLOWLIST = new Set([
+  'SCIENCE$ENERGY_VALUE',
+  'SCIENCE$FILE_SIZE',
   'BRANDING$EM_NAME',
   'BRANDING$EM_EYEBROW',
   'BRANDING$EM_SCIENCE',

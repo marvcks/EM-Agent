@@ -144,3 +144,10 @@ export const CONFIG_CACHE_OPTIONS = {
 } as const;
 
 export type QueryKeys = (typeof QUERY_KEYS)[keyof typeof QUERY_KEYS];
+
+/** Same-origin EM-Agent science service; independent of conversation backends. */
+export const SCIENCE_QUERY_KEYS = {
+  apps: ["science-apps"] as const,
+  jobs: ["science-jobs"] as const,
+  job: (id: string | null) => ["science-jobs", id] as const,
+} as const;
