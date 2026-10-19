@@ -111,3 +111,8 @@ CPU affinity，沿用申请内存语义。服务器管理记录在 `/root/EM-Age
 镜像自带 `aizynthfinder` / `lcms2yield` 用户技能，无同名技能时链接到持久化技能目录；
 已有对话需新建才能加载。Agent CLI 真正调用共用 API；这不等同于已验收 LLM 的
 自然语言规划行为。
+
+反应任务的临时目录由服务创建在 `/tmp/em-science-*`（私有权限），而非长的
+持久化任务路径下；PyTorch 多进程使用 Unix socket，长 TMPDIR 会触发
+`AF_UNIX path too long` 并使上游加载器等待。成功、失败、停止和超时均由
+Manager 的 finally 清理这个短临时目录，持久化输入/日志/结果路径保持原样。

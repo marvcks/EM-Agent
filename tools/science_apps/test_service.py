@@ -12,6 +12,28 @@ WATER = '3\nwater\nO 0 0 0\nH 0.7586 0 0.5043\nH -0.7586 0 0.5043\n'
 
 
 class ScienceTests(unittest.TestCase):
+    def test_reaction_ipc_works_with_long_persistent_paths_and_cleans_scratch(self):
+        async def exercise(root):
+            executable = root / 'ipc-model'
+            executable.write_text('#!/usr/bin/env python3\n'
+                'import json, tempfile\nfrom multiprocessing.connection import Listener\n'
+                'from pathlib import Path\n'
+                'with Listener(str(Path(tempfile.gettempdir()) / "ipc.sock"), family="AF_UNIX") as listener:\n'
+                '    print("scratch=" + tempfile.gettempdir())\n'
+                'Path("result.json").write_text(json.dumps({"verified":True,"app_id":"lcms2yield","correction_factors":[{"smiles":"c1ccccc1","cf":1.13}]}))\n'
+                'print("EM_AGENT_REACTION_COMPLETE")\n')
+            executable.chmod(0o755)
+            manager = Manager(root / ('persistent-' + 'a' * 80))
+            with patch('tools.science_apps.service.application_executable', return_value=str(executable)):
+                job = manager.submit(JobRequest(app_id='lcms2yield', task='correction_factor', smiles='c1ccccc1'))
+                await manager.run(job['id'])
+            detail = manager.detail(job['id'])
+            self.assertEqual(detail['status'], 'succeeded', detail['log'])
+            scratch = next(line.removeprefix('scratch=') for line in detail['log'].splitlines() if line.startswith('scratch='))
+            self.assertFalse(Path(scratch).exists())
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
+
     def test_reaction_inputs_use_smiles_and_bounded_search(self):
         request = JobRequest(app_id='aizynthfinder', task='retrosynthesis', smiles='CC(=O)Oc1ccccc1C(=O)O')
         name, content, args = prepare_input(request)

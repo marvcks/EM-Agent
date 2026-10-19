@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import tempfile
 import time
 from typing import Literal
 from uuid import uuid4
@@ -265,8 +266,14 @@ class Manager:
         request = JobRequest(**job['request'])
         name, _, args = prepare_input(request)
         executable = application_executable(request.app_id)
-        scratch = directory / 'scratch'
-        scratch.mkdir(exist_ok=True)
+        # PyTorch multiprocessing uses Unix sockets beneath TMPDIR. Persistent
+        # job paths exceed AF_UNIX's path limit, so reaction jobs get a short,
+        # private scratch path. The same finally block removes it on stop/failure.
+        if request.app_id in REACTION_APPS:
+            scratch = Path(tempfile.mkdtemp(prefix='em-science-', dir='/tmp'))
+        else:
+            scratch = directory / 'scratch'
+            scratch.mkdir(exist_ok=True)
         # ORCA uses PAL/MPI workers; each worker must not spawn another cores-sized BLAS pool.
         threads = '1' if request.app_id == 'orca' else str(request.cores)
         environment = {**os.environ, 'OMP_NUM_THREADS': threads, 'OPENBLAS_NUM_THREADS': threads,
