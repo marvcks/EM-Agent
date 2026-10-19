@@ -134,3 +134,9 @@ No Agent/automation contracts or versions change. Generic upstream images and
 launchers leave this fork-specific service disabled. On shutdown the service
 terminates the current scientific process group; interrupted tasks never resume
 automatically. See `docs/em-agent-science-apps.md` for local development.
+
+MinerU's document endpoint streams raw PDF/DOC/DOCX bytes with a separate 20 MiB
+bound; retain the smaller JSON limit for other science endpoints. Its standard-
+library runner reads the credential from the existing persistent data mount
+(`~/.openhands/mineru/api-token`), not a frontend variable. It shares job lifecycle
+and cancellation, but the upstream cloud task may continue after local stop.

@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""Convert PDF/Word documents to Markdown through EM-Agent's shared scientific queue."""
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+
+def api(path, payload=None):
+    key = os.environ.get('LOCAL_BACKEND_API_KEY') or os.environ.get('OH_SESSION_API_KEYS_0')
+    if not key:
+        raise RuntimeError('Runtime session key is unavailable')
+    request = urllib.request.Request('http://127.0.0.1:8000/api/science' + path,
+        data=(payload if isinstance(payload, bytes) else json.dumps(payload).encode()) if payload is not None else None,
+        headers={'X-Session-API-Key': key, 'Content-Type': 'application/octet-stream' if isinstance(payload, bytes) else 'application/json'})
+    with urllib.request.urlopen(request, timeout=120) as response:
+        return response.read()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest='command', required=True)
+    submit = commands.add_parser('submit')
+    submit.add_argument('document', type=Path)
+    submit.add_argument('--method', choices=['vlm', 'pipeline'], default='vlm')
+    submit.add_argument('--language', choices=['auto', 'en', 'ch'], default='auto')
+    submit.add_argument('--no-formula', action='store_true')
+    submit.add_argument('--no-table', action='store_true')
+    submit.add_argument('--title', default='')
+    commands.add_parser('apps')
+    commands.add_parser('jobs')
+    for name in ['status', 'cancel', 'download']:
+        command = commands.add_parser(name)
+        command.add_argument('job_id')
+        if name == 'download':
+            command.add_argument('directory', type=Path)
+    args = parser.parse_args()
+    if args.command == 'submit':
+        document = args.document.expanduser().resolve()
+        if document.suffix.lower() not in {'.pdf', '.doc', '.docx'} or not 0 < document.stat().st_size <= 20 * 1024 * 1024:
+            raise ValueError('Expected a nonempty PDF/DOC/DOCX file up to 20 MB')
+        query = urllib.parse.urlencode({'filename': document.name, 'method': args.method,
+            'language': args.language, 'title': args.title,
+            'enable_formula': str(not args.no_formula).lower(), 'enable_table': str(not args.no_table).lower()})
+        result = api('/documents?' + query, document.read_bytes())
+    elif args.command in {'apps', 'jobs'}:
+        result = api('/' + args.command)
+    else:
+        path = '/jobs/' + urllib.parse.quote(args.job_id, safe='')
+        result = api(path + '/cancel', {}) if args.command == 'cancel' else api(path)
+        if args.command == 'download':
+            job = json.loads(result)
+            args.directory.mkdir(parents=True, exist_ok=True)
+            saved = []
+            for entry in job['files']:
+                name = entry['name']
+                destination = args.directory / name
+                if Path(name).name != name or destination.exists() or destination.is_symlink():
+                    raise ValueError('Unsafe or existing download target: ' + name)
+                with destination.open('xb') as stream:
+                    stream.write(api(path + '/files/' + urllib.parse.quote(name, safe='')))
+                saved.append(str(destination))
+            result = json.dumps({'saved': saved}).encode()
+    value = json.loads(result)
+    print(json.dumps(value, ensure_ascii=False, indent=2))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except urllib.error.HTTPError as exc:
+        print(f'Science API HTTP {exc.code}: {exc.read().decode()}', file=sys.stderr)
+        sys.exit(1)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)

@@ -27,6 +27,7 @@ from .magus_runner import MODEL_DIR, RUNTIME_PYTHON, validate_search
 from .reaction_runner import REACTION_APPS, runtime_available, validate_request, verified_result
 
 from .bde_runner import bde_available, validate_bde, verified_bde
+from .mineru_runner import MAX_DOCUMENT_BYTES, mineru_available, validate_document, verified_mineru
 
 PREFIX = '/api/science'
 MAX_LOG_BYTES = 10 * 1024 * 1024
@@ -34,6 +35,7 @@ TIMEOUT_SECONDS = 900
 ACTIVE = {'queued', 'running'}
 ELEMENTS = ('H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og').split()
 APPLICATIONS = {
+    'mineru': {'name': 'MinerU', 'executable': 'mineru-parse', 'methods': ['vlm', 'pipeline'], 'bases': [], 'category': 'document'},
     'bde': {'name': 'BDE', 'executable': 'bde-analyze', 'methods': ['ALFABET', 'Psi4'], 'bases': [], 'category': 'bond'},
     'xtb': {'name': 'xTB', 'executable': 'xtb', 'methods': ['GFN2-xTB', 'GFN1-xTB'], 'bases': [], 'category': 'semiempirical'},
     'orca': {'name': 'ORCA', 'executable': 'orca', 'methods': ['r2SCAN-3c', 'HF', 'B3LYP'], 'bases': ['def2-SVP', 'def2-TZVP'], 'category': 'quantum'},
@@ -46,6 +48,8 @@ APPLICATIONS = {
 
 def application_executable(app_id):
     executable = shutil.which(APPLICATIONS[app_id]['executable'])
+    if app_id == 'mineru' and not mineru_available():
+        return None
     if app_id == 'bde' and not bde_available():
         return None
     if app_id in REACTION_APPS and not runtime_available(app_id):
@@ -58,13 +62,17 @@ def application_executable(app_id):
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde']
+    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru']
+    document_name: str = Field(default='', max_length=128)
+    language: Literal['en', 'ch', 'auto'] = 'auto'
+    enable_formula: bool = True
+    enable_table: bool = True
     xyz: str = Field(default='', max_length=65536)
     smiles: str = Field(default='', max_length=32768)
     input_kind: Literal['smiles', 'name'] = 'smiles'
     compound_name: str = Field(default='', max_length=256)
     title: str = Field(default='', max_length=80)
-    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde'] = 'energy'
+    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde', 'textify'] = 'energy'
     method: str = ''
     basis: str = ''
     charge: int = Field(default=0, ge=-10, le=10)
@@ -120,6 +128,11 @@ def prepare_input(request):
     basis = request.basis or (config['bases'][0] if config['bases'] else '')
     if method not in config['methods'] or (basis and basis not in config['bases']):
         raise ValueError('invalid_method')
+    if request.app_id == 'mineru':
+        if request.task != 'textify' or request.xyz or request.smiles or not request.document_name:
+            raise ValueError('invalid_document')
+        request.method = method
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
     if request.app_id == 'bde':
         validate_bde(request)
         request.method = method
@@ -186,10 +199,14 @@ class Manager:
         temporary.write_text(json.dumps(job, ensure_ascii=False, indent=2))
         temporary.replace(temporary.with_name('job.json'))
 
-    def submit(self, request):
+    def submit(self, request, document=None):
         if sum(job['status'] in ACTIVE for job in self.jobs.values()) >= 10:
             raise HTTPException(429, 'queue_full')
         name, content, _ = prepare_input(request)
+        if request.app_id == 'mineru':
+            if document is None:
+                raise ValueError('invalid_document')
+            suffix = validate_document(request.document_name, document)
         executable = application_executable(request.app_id)
         if not executable:
             raise HTTPException(409, 'app_unavailable')
@@ -197,6 +214,8 @@ class Manager:
         directory = self.directory(job_id)
         directory.mkdir(mode=0o700)
         (directory / name).write_text(content)
+        if request.app_id == 'mineru':
+            (directory / ('document' + suffix)).write_bytes(document)
         if request.xyz:
             (directory / 'structure.xyz').write_text(request.xyz)
         job = {'id': job_id, 'app_id': request.app_id, 'title': request.title.strip() or APPLICATIONS[request.app_id]['name'],
@@ -314,7 +333,7 @@ class Manager:
                 job['exit_code'] = await self.process.wait()
             text = log_path.read_text(errors='replace')
             markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE',
-                       'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE'}
+                       'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE', 'mineru': 'EM_AGENT_MINERU_COMPLETE'}
             if job['status'] != 'cancelled':
                 success = job['exit_code'] == 0 and markers[job['app_id']].lower() in text.lower() and not job['error']
                 if success and job['app_id'] == 'magus':
@@ -332,6 +351,11 @@ class Manager:
                 if success and job['app_id'] == 'bde':
                     result = json.loads((directory / 'result.json').read_text())
                     success = verified_bde(result) and result.get('mode') == request.method
+                    if success:
+                        job['result'] = result
+                if success and job['app_id'] == 'mineru':
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = verified_mineru(result, directory)
                     if success:
                         job['result'] = result
                 job['status'] = 'succeeded' if success else 'failed'
@@ -390,7 +414,7 @@ def create_app(root=None, key=None):
         supplied = request.headers.get('X-Session-API-Key', '')
         if not hmac.compare_digest(supplied.encode(), app.state.session_key.encode()):
             return JSONResponse({'detail': 'unauthorized'}, status_code=401)
-        if request.method == 'POST':
+        if request.method == 'POST' and request.url.path != PREFIX + '/documents':
             if int(request.headers.get('content-length', '0')) > 131072:
                 return JSONResponse({'detail': 'input_too_large'}, status_code=413)
             if len(await request.body()) > 131072:
@@ -423,6 +447,35 @@ def create_app(root=None, key=None):
             return app.state.manager.submit(request)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
+
+    # @spec MINERU-001 — Stream uploads with a hard byte bound, then enqueue atomically
+    @app.post(PREFIX + '/documents', status_code=201)
+    async def document(request: Request, filename: str, title: str = '',
+                       method: Literal['vlm', 'pipeline'] = 'vlm',
+                       language: Literal['en', 'ch', 'auto'] = 'auto',
+                       enable_formula: bool = True, enable_table: bool = True):
+        try:
+            size = int(request.headers.get('content-length', '0'))
+        except ValueError:
+            raise HTTPException(422, 'invalid_document') from None
+        if size > MAX_DOCUMENT_BYTES:
+            raise HTTPException(413, 'input_too_large')
+        if not application_executable('mineru'):
+            raise HTTPException(409, 'app_unavailable')
+        if sum(job['status'] in ACTIVE for job in app.state.manager.jobs.values()) >= 10:
+            raise HTTPException(429, 'queue_full')
+        data = bytearray()
+        async for chunk in request.stream():
+            if len(data) + len(chunk) > MAX_DOCUMENT_BYTES:
+                raise HTTPException(413, 'input_too_large')
+            data.extend(chunk)
+        try:
+            job_request = JobRequest(app_id='mineru', task='textify', document_name=filename,
+                title=title, method=method, language=language, enable_formula=enable_formula,
+                enable_table=enable_table, cores=1, memory_mb=512)
+            return app.state.manager.submit(job_request, bytes(data))
+        except ValueError:
+            raise HTTPException(422, 'invalid_document') from None
 
     @app.get(PREFIX + '/jobs/{job_id}')
     async def detail(job_id: str):

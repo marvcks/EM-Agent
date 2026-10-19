@@ -31,8 +31,10 @@ import {
 
 import { BDEForm, BDEResult } from "./bde-form";
 import { ReactionForm } from "./reaction-form";
+import { MinerUForm } from "./mineru-form";
 
 const DESCRIPTION_KEYS = {
+  mineru: I18nKey.SCIENCE$MINERU_DESCRIPTION,
   bde: I18nKey.SCIENCE$BDE_DESCRIPTION,
   xtb: I18nKey.SCIENCE$XTB_DESCRIPTION,
   orca: I18nKey.SCIENCE$ORCA_DESCRIPTION,
@@ -49,6 +51,8 @@ const STATUS_KEYS: Record<ScienceJobStatus, I18nKey> = {
   cancelled: I18nKey.SCIENCE$CANCELLED,
 };
 const ERROR_KEYS: Record<string, I18nKey> = {
+  invalid_document: I18nKey.SCIENCE$DOCUMENT_ERROR,
+  input_too_large: I18nKey.SCIENCE$DOCUMENT_ERROR,
   invalid_bde_input: I18nKey.SCIENCE$BDE_INPUT_ERROR,
   invalid_smiles: I18nKey.SCIENCE$INVALID_SMILES,
   invalid_reaction_input: I18nKey.SCIENCE$INVALID_SMILES,
@@ -64,6 +68,7 @@ const ERROR_KEYS: Record<string, I18nKey> = {
   invalid_volume: I18nKey.SCIENCE$VOLUME_ERROR,
 };
 const CATEGORY_KEYS = {
+  document: I18nKey.SCIENCE$DOCUMENT_CATEGORY,
   bond: I18nKey.SCIENCE$BDE_CATEGORY,
   all: I18nKey.SCIENCE$ALL,
   quantum: I18nKey.SCIENCE$QUANTUM,
@@ -73,6 +78,7 @@ const CATEGORY_KEYS = {
 };
 const SCIENCE_CATEGORIES = [
   "all",
+  "document",
   "bond",
   "quantum",
   "semiempirical",
@@ -230,7 +236,13 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
               </span>
             </div>
             <div className="em-science-workbench">
-              {selected.id === "bde" ? (
+              {selected.id === "mineru" ? (
+                <MinerUForm
+                  app={selected}
+                  onCreated={onSelectJob}
+                  renderError={(error) => <ErrorMessage error={error} />}
+                />
+              ) : selected.id === "bde" ? (
                 <BDEForm
                   app={selected}
                   onCreated={onSelectJob}
@@ -337,9 +349,11 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                     <span>{t(CATEGORY_KEYS[app.category])}</span>
                     <span>
                       {t(
-                        app.category === "reaction"
-                          ? I18nKey.SCIENCE$SMILES_INPUT
-                          : I18nKey.SCIENCE$XYZ_INPUT,
+                        app.category === "document"
+                          ? I18nKey.SCIENCE$DOCUMENT_UPLOAD
+                          : app.category === "reaction"
+                            ? I18nKey.SCIENCE$SMILES_INPUT
+                            : I18nKey.SCIENCE$XYZ_INPUT,
                       )}
                     </span>
                   </div>
@@ -838,6 +852,11 @@ function JobResult({ jobId }: { jobId: string | null }) {
           )}
           {job.app_id === "bde" && job.status === "succeeded" && job.result && (
             <BDEResult result={job.result} />
+          )}
+          {job.app_id === "mineru" && job.status === "succeeded" && (
+            <p className="em-science-help">
+              {t(I18nKey.SCIENCE$MINERU_RESULT_NOTE)}
+            </p>
           )}
           <h3>{t(I18nKey.SCIENCE$LOG)}</h3>
           <textarea

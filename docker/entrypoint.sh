@@ -293,6 +293,12 @@ if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ] && [ -x /opt/em-agent-tools/magus/mac
   fi
 fi
 if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ]; then
+  if [ -s "${MINERU_TOKEN_FILE:-$OPENHANDS_DIR/mineru/api-token}" ] || [ -n "${MINERU_API_TOKEN:-${MINERU_TOKEN:-${mineru_key_api:-}}}" ]; then
+    mkdir -p "$OPENHANDS_DIR/skills"
+    if [ ! -e "$OPENHANDS_DIR/skills/mineru" ] && [ ! -L "$OPENHANDS_DIR/skills/mineru" ]; then
+      ln -s /opt/agent-canvas/science_apps/skills/mineru "$OPENHANDS_DIR/skills/mineru"
+    fi
+  fi
   for reaction_tool in aizynthfinder lcms2yield bde; do
     if [ -x "/opt/em-agent-tools/$reaction_tool/.venv/bin/python" ]; then
       mkdir -p "$OPENHANDS_DIR/skills"

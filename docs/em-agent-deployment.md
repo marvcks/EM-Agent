@@ -178,3 +178,14 @@ Psi4 环境、manifest、官方预处理文件和模型文件，并添加 BDE �
 启动时仅在无同名用户技能时链接 `bde`。模型文件在安装时下载并校验 SHA-256，推理期间
 不联网下载权重。版本、源提交、模型散列及 Python/Conda 锁文件保存在工具目录，安装与
 部署证据见本地 BDE 报告。不要在线改容器源码或升级 Agent Server 的包来修复科学依赖。
+
+### MinerU 云端适配
+
+镜像包含标准库适配器 `mineru-parse`、共用队列 CLI `em-mineru` 和 `mineru` 使用技能。
+凭据通过已有 data 挂载中的 `/home/openhands/.openhands/mineru/api-token` 提供；
+宿主机对应 `/opt/openhands/data/mineru/api-token`。文件权限 0600，目录 0700，
+所有者须为容器实际运行用户；不增加模型/环境挂载或修改 Agent Server 的依赖。
+启动时存在该凭据文件且无同名技能才链接 bundled skill。保留同名用户技能及禁用偏好。
+更新凭据文件无需重建镜像；首次启用技能需容器启动并新建对话。
+入口上传最大 20 MiB，已有 Nginx 100m 限制可容纳。转换失败须检查上游凭据/额度/文档限制，
+不能用降级模拟结果验收。完整原始结果包与 Markdown 随 science-apps 数据持久保存。

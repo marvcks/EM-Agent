@@ -152,3 +152,37 @@ em-bde download JOB_ID ./bde-results
 参考论文：https://www.nature.com/articles/s41467-020-16201-z 。
 用户提供的正文、SI PDF 和自由基 XYZ 用于协议核对；本地 MOESM2 DOCX 内容与论文不符，
 不参与计算或模型构建。权重、环境、安装器及论文附件均不进入应用镜像。
+
+## MinerU：数据挖掘与标注 / 文档文本化
+
+入口 **科学应用 → 数据挖掘与标注 → MinerU**，或 `/canvas/science-apps/mineru`。
+上传 PDF、DOC 或 DOCX，选择 `vlm`（默认）/`pipeline`、语言以及公式/表格识别，
+提交后使用同一任务队列、日志、停止、历史及下载功能。手动页面不调用 Agent/LLM。
+
+此入口调用 [MinerU 官方云 API](https://mineru.net/apiManage/docs)，文件会上传到第三方服务。
+本演示单文件限 **20 MiB、200 页、900 秒**；页数、加密与解析支持情况由上游检查。
+队列仍串行、最多 10 个活动任务。停止结束本地等待/下载；上游没有取消 API，
+云端解析可能继续消耗配额。服务重启不自动重传。失败不发布成功结果。
+
+服务器凭据放在持久化 `~/.openhands/mineru/api-token`（0600，运行用户所有），
+亦可由 `MINERU_TOKEN_FILE` 指定，或从既有 `MINERU_API_TOKEN` / `MINERU_TOKEN` /
+`mineru_key_api` 环境读取。凭据与临时签名 URL 不进入任务、日志、镜像或 Git。
+适配器只用 Python 标准库，不安装大模型，不升级 Agent Server 依赖。
+可用性只表明程序与凭据存在；凭据过期/配额/网络失败会在任务日志给出错误码。
+
+下载 `document.md` 获取纯文本副本；**完整结果为 `results.zip`**，包含原始 Markdown、
+图片与 JSON。解压后保留 `full.md` 周围的相对路径。`result.json` 保存来源文件和解析模型，
+`mineru-task.json` 保存上游任务 ID/状态；上传原件也保留在任务目录。成功须满足正常退出、
+完成标记、有效 ZIP、唯一非空 `full.md`，解压有路径与总大小限制。
+
+Agent 新对话加载 `mineru` 使用技能，CLI 与手动页面共用 `/api/science`：
+
+```sh
+em-mineru submit /absolute/path/paper.pdf --language en
+em-mineru submit /absolute/path/report.docx --language ch
+em-mineru status JOB_ID
+em-mineru cancel JOB_ID
+em-mineru download JOB_ID ./mineru-results
+```
+
+解析文本须核对原文后用于数据挖掘/标注；此步骤不自动生成科研真值标签。

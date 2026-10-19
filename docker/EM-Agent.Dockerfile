@@ -38,5 +38,7 @@ RUN install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magu
  && install -m 755 /opt/agent-canvas/science_apps/lcms-cf /usr/local/bin/lcms-cf \
  && install -m 755 /opt/agent-canvas/science_apps/em-reaction /usr/local/bin/em-reaction \
  && install -m 755 /opt/agent-canvas/science_apps/bde-analyze /usr/local/bin/bde-analyze \
- && install -m 755 /opt/agent-canvas/science_apps/em-bde /usr/local/bin/em-bde
+ && install -m 755 /opt/agent-canvas/science_apps/em-bde /usr/local/bin/em-bde \
+ && install -m 755 /opt/agent-canvas/science_apps/mineru-parse /usr/local/bin/mineru-parse \
+ && install -m 755 /opt/agent-canvas/science_apps/em-mineru /usr/local/bin/em-mineru
 USER openhands

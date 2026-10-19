@@ -18,11 +18,23 @@ vi.mock("#/api/science-apps-service", async (importOriginal) => ({
     jobs: vi.fn(),
     job: vi.fn(),
     submit: vi.fn(),
+    submitDocument: vi.fn(),
     cancel: vi.fn(),
     download: vi.fn(),
   },
 }));
 const applications: ScienceApplication[] = [
+  {
+    id: "mineru",
+    name: "MinerU",
+    category: "document",
+    available: true,
+    methods: ["vlm", "pipeline"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  },
   {
     id: "bde",
     name: "BDE",
@@ -112,6 +124,10 @@ beforeEach(() => {
   vi.mocked(scienceAppsService.jobs).mockResolvedValue([]);
   vi.mocked(scienceAppsService.job).mockResolvedValue(job);
   vi.mocked(scienceAppsService.submit).mockResolvedValue(job);
+  vi.mocked(scienceAppsService.submitDocument).mockResolvedValue({
+    ...job,
+    app_id: "mineru",
+  });
   vi.mocked(scienceAppsService.cancel).mockImplementation(async () => {
     const stopped: ScienceJobDetail = { ...job, status: "cancelled" };
     vi.mocked(scienceAppsService.job).mockResolvedValue(stopped);
@@ -120,6 +136,43 @@ beforeEach(() => {
 });
 
 describe("manual scientific applications", () => {
+  // @spec MINERU-004 — Upload documents with parser options and no molecular fields
+  it("submits a Word file to MinerU and clears a previous selection after invalid input", async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    const onSelectJob = vi.fn();
+    renderWithProviders(
+      <ScienceAppsPage appId="mineru" jobId={null} onSelectJob={onSelectJob} />,
+    );
+    const input = await screen.findByLabelText("SCIENCE$DOCUMENT_UPLOAD");
+    const submit = screen.getByTestId("science-submit");
+    expect(submit).toBeDisabled();
+    expect(
+      screen.queryByLabelText("SCIENCE$XYZ_INPUT"),
+    ).not.toBeInTheDocument();
+    const file = new File(["word fixture"], "paper.docx");
+    await user.upload(input, file);
+    await user.selectOptions(
+      screen.getByLabelText("SCIENCE$DOCUMENT_LANGUAGE"),
+      "en",
+    );
+    await user.click(screen.getByLabelText("SCIENCE$DOCUMENT_FORMULA"));
+    await user.click(submit);
+    await waitFor(() =>
+      expect(scienceAppsService.submitDocument).toHaveBeenCalledWith(file, {
+        title: "",
+        method: "vlm",
+        language: "en",
+        enable_formula: false,
+        enable_table: true,
+      }),
+    );
+    expect(onSelectJob).toHaveBeenCalledWith(job.id);
+    await user.upload(input, new File(["invalid"], "paper.exe"));
+    expect(submit).toBeDisabled();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "SCIENCE$DOCUMENT_ERROR",
+    );
+  });
   // @spec BDE-004 — Render and submit the real BDE contract
   it("submits names in Psi4 mode and displays numbered bond values and graph", async () => {
     const user = userEvent.setup();

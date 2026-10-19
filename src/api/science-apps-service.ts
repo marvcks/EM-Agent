@@ -10,6 +10,7 @@ export const SCIENCE_EXAMPLE_XYZ =
 export const SCIENCE_MAGUS_EXAMPLE_XYZ =
   "5\nMethane\nC 0 0 0\nH 0.63 0.63 0.63\nH -0.63 -0.63 0.63\nH -0.63 0.63 -0.63\nH 0.63 -0.63 -0.63\n";
 export const SCIENCE_APP_IDS = [
+  "mineru",
   "xtb",
   "orca",
   "gaussian",
@@ -31,7 +32,13 @@ export type ScienceJobStatus =
 export interface ScienceApplication {
   id: ScienceAppId;
   name: string;
-  category: "semiempirical" | "quantum" | "crystal" | "reaction" | "bond";
+  category:
+    | "semiempirical"
+    | "quantum"
+    | "crystal"
+    | "reaction"
+    | "bond"
+    | "document";
   available: boolean;
   methods: string[];
   bases: string[];
@@ -52,7 +59,12 @@ export interface ScienceJobRequest {
     | "search"
     | "retrosynthesis"
     | "correction_factor"
-    | "bde";
+    | "bde"
+    | "textify";
+  document_name?: string;
+  language?: "auto" | "en" | "ch";
+  enable_formula?: boolean;
+  enable_table?: boolean;
   method: string;
   basis: string;
   charge: number;
@@ -82,6 +94,10 @@ export interface ScienceJob {
   energy_hartree: number | null;
   energy_ev?: number | null;
   result?: {
+    markdown_file?: string;
+    markdown_characters?: number;
+    bundle_file?: string;
+    source_name?: string;
     mode?: "ALFABET" | "Psi4";
     canonical_smiles?: string;
     diagram_png_base64?: string;
@@ -107,6 +123,14 @@ export interface ScienceJobDetail extends ScienceJob {
   request: ScienceJobRequest;
   log: string;
   files: { name: string; size: number }[];
+}
+export const MAX_SCIENCE_DOCUMENT_BYTES = 20 * 1024 * 1024;
+export interface ScienceDocumentOptions {
+  title: string;
+  method: "vlm" | "pipeline";
+  language: "auto" | "en" | "ch";
+  enable_formula: boolean;
+  enable_table: boolean;
 }
 export class ScienceApiError extends Error {
   constructor(public code: string) {
@@ -140,6 +164,17 @@ export const scienceAppsService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }),
+  submitDocument: (file: File, options: ScienceDocumentOptions) => {
+    const query = new URLSearchParams({ filename: file.name });
+    Object.entries(options).forEach(([key, value]) =>
+      query.set(key, String(value)),
+    );
+    return json<ScienceJob>(`/documents?${query}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: file,
+    });
+  },
   cancel: (id: string) =>
     json<ScienceJobDetail>(`/jobs/${encodeURIComponent(id)}/cancel`, {
       method: "POST",
