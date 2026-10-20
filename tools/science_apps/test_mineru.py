@@ -50,6 +50,7 @@ class MinerUTests(unittest.TestCase):
                 self.assertEqual(client.post('/api/science/documents?filename=paper.pdf&language=auto', content=b'%PDF-1.4', headers=headers).status_code, 422)
 
     # @spec MINERU-002 — PDF and Word use MinerU and preserve linked assets
+    # @spec SJT-001 — Long-running parsing is controlled by the job service, not a second deadline
     def test_cloud_workflow_and_no_secrets_in_results(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -61,8 +62,13 @@ class MinerUTests(unittest.TestCase):
                 calls.append((method, path, payload))
                 if method == 'POST':
                     return {'batch_id': 'batch-1', 'file_urls': ['https://assets.example/upload?secret=signed']}
+                if sum(call[0] == 'GET' for call in calls) == 1:
+                    return {'extract_result': [{'data_id': 'em-agent', 'state': 'running'}]}
                 return {'extract_result': [{'data_id': 'em-agent', 'state': 'done', 'full_zip_url': 'https://assets.example/result?secret=signed'}]}
-            with patch('tools.science_apps.mineru_runner.api', side_effect=api), patch('tools.science_apps.mineru_runner.transfer') as transfer:
+            with patch('tools.science_apps.mineru_runner.api', side_effect=api), \
+                    patch('tools.science_apps.mineru_runner.time.monotonic', side_effect=[0, 1, 901]), \
+                    patch('tools.science_apps.mineru_runner.time.sleep'), \
+                    patch('tools.science_apps.mineru_runner.transfer') as transfer:
                 def transfer_file(method, url, destination=None, source=None):
                     if destination:
                         destination.write_bytes(bundle({'paper/full.md': '# Example\n\n![](images/figure.png)', 'paper/images/figure.png': b'png'}))

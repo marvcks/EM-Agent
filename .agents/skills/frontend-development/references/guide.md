@@ -20,6 +20,12 @@ Bundled catalog skills use the persisted `enabled_skills` allow-list defaulted f
 
 ## Workspace files
 
+Chat attachment size limits belong to `src/utils/file-validation.ts`: 50 MiB per
+file and 100 MiB per message, including images and existing attachments. Keep
+selection, drag/drop, and send paths on this shared validator; exercise the
+exact limits and one-byte-over cases in `attachment-size-validation.test.ts`.
+Science-app document limits are independent of conversation attachments.
+
 Local Files discovery preferences belong to `misc_settings.app_preferences.workspace_file_discovery`, keyed by working directory on the active backend. `useWorkspaceFileDiscovery` reads the settings cache and saves sparse workspace patches. Preserve default exclusions and the 2,000-file cap when no configuration exists. Fetch one extra result to distinguish truncation from an exact-size list. Cloud keeps its server-side listing contract without these controls. See `specs/workspace-file-discovery.md`.
 
 ## Caret appearance contracts

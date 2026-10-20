@@ -23,7 +23,9 @@ em-magus download JOB_ID ./magus-results
 The volume bounds are Å³ for the **whole cell**. The example bounds suit four methane
 molecules; estimate or ask for bounds appropriate to a different molecule. The limits
 are 128 atoms in the cell, 1–8 copies, population 4–12, 1–10 generations, 1–8 CPU
-threads, requested memory up to 8 GiB, 15 minutes, and at most 10 queued/running jobs.
+threads, requested memory up to 8 GiB, and at most 10 queued/running jobs.
+Agent submissions have no platform duration limit; use `status` to monitor and
+`cancel` when appropriate. The manual page retains its 15-minute limit.
 Memory is a request, not an OS enforced limit. Poll an active job at sensible intervals.
 
 Results include candidate CIF/POSCAR, `result.json` and `results.zip` with native

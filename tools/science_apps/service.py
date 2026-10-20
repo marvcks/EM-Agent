@@ -19,7 +19,7 @@ import time
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -199,7 +199,7 @@ class Manager:
         temporary.write_text(json.dumps(job, ensure_ascii=False, indent=2))
         temporary.replace(temporary.with_name('job.json'))
 
-    def submit(self, request, document=None):
+    def submit(self, request, document=None, *, source: Literal['manual', 'agent'] = 'manual'):
         if sum(job['status'] in ACTIVE for job in self.jobs.values()) >= 10:
             raise HTTPException(429, 'queue_full')
         name, content, _ = prepare_input(request)
@@ -218,7 +218,8 @@ class Manager:
             (directory / ('document' + suffix)).write_bytes(document)
         if request.xyz:
             (directory / 'structure.xyz').write_text(request.xyz)
-        job = {'id': job_id, 'app_id': request.app_id, 'title': request.title.strip() or APPLICATIONS[request.app_id]['name'],
+        job = {'id': job_id, 'app_id': request.app_id, 'source': source,
+               'title': request.title.strip() or APPLICATIONS[request.app_id]['name'],
                'status': 'queued', 'created_at': now(), 'started_at': None, 'finished_at': None,
                'error': None, 'energy_hartree': None, 'energy_ev': None, 'exit_code': None, 'request': request.model_dump()}
         self.jobs[job_id] = job
@@ -322,8 +323,10 @@ class Manager:
                 started = time.monotonic()
                 waiter = asyncio.create_task(self.process.wait())
                 while self.process.returncode is None:
-                    if time.monotonic() - started > TIMEOUT_SECONDS or log_path.stat().st_size > MAX_LOG_BYTES:
-                        job['error'] = 'timeout' if time.monotonic() - started > TIMEOUT_SECONDS else 'output_limit'
+                    # @spec SJT-001 — Agent jobs have no platform duration limit; legacy jobs remain manual
+                    timed_out = job.get('source', 'manual') != 'agent' and time.monotonic() - started > TIMEOUT_SECONDS
+                    if timed_out or log_path.stat().st_size > MAX_LOG_BYTES:
+                        job['error'] = 'timeout' if timed_out else 'output_limit'
                         await self.terminate()
                         break
                     try:
@@ -432,19 +435,21 @@ def create_app(root=None, key=None):
         return {'status': 'ok'}
 
     @app.get(PREFIX + '/apps')
-    async def apps():
+    async def apps(source: Literal['manual', 'agent'] = Header(default='manual', alias='X-EM-Agent-Source')):
         return [{'id': app_id, **{k: v for k, v in config.items() if k != 'executable'},
                  'available': application_executable(app_id) is not None,
-                 'max_cores': 8, 'max_memory_mb': 8192, 'timeout_seconds': TIMEOUT_SECONDS} for app_id, config in APPLICATIONS.items()]
+                 'max_cores': 8, 'max_memory_mb': 8192,
+                 'timeout_seconds': None if source == 'agent' else TIMEOUT_SECONDS} for app_id, config in APPLICATIONS.items()]
 
     @app.get(PREFIX + '/jobs')
     async def jobs():
         return [{k: v for k, v in job.items() if k != 'request'} for job in sorted(app.state.manager.jobs.values(), key=lambda item: item['created_at'], reverse=True)[:100]]
 
     @app.post(PREFIX + '/jobs', status_code=201)
-    async def submit(request: JobRequest):
+    async def submit(request: JobRequest,
+                     source: Literal['manual', 'agent'] = Header(default='manual', alias='X-EM-Agent-Source')):
         try:
-            return app.state.manager.submit(request)
+            return app.state.manager.submit(request, source=source)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
 
@@ -453,7 +458,8 @@ def create_app(root=None, key=None):
     async def document(request: Request, filename: str, title: str = '',
                        method: Literal['vlm', 'pipeline'] = 'vlm',
                        language: Literal['en', 'ch'] = 'ch',
-                       enable_formula: bool = True, enable_table: bool = True):
+                       enable_formula: bool = True, enable_table: bool = True,
+                       source: Literal['manual', 'agent'] = Header(default='manual', alias='X-EM-Agent-Source')):
         try:
             size = int(request.headers.get('content-length', '0'))
         except ValueError:
@@ -473,7 +479,7 @@ def create_app(root=None, key=None):
             job_request = JobRequest(app_id='mineru', task='textify', document_name=filename,
                 title=title, method=method, language=language, enable_formula=enable_formula,
                 enable_table=enable_table, cores=1, memory_mb=512)
-            return app.state.manager.submit(job_request, bytes(data))
+            return app.state.manager.submit(job_request, bytes(data), source=source)
         except ValueError:
             raise HTTPException(422, 'invalid_document') from None
 

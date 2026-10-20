@@ -16,7 +16,7 @@ def api(path, payload=None):
         raise RuntimeError('Runtime session key is unavailable')
     request = urllib.request.Request('http://127.0.0.1:8000/api/science' + path,
         data=(payload if isinstance(payload, bytes) else json.dumps(payload).encode()) if payload is not None else None,
-        headers={'X-Session-API-Key': key, 'Content-Type': 'application/octet-stream' if isinstance(payload, bytes) else 'application/json'})
+        headers={'X-Session-API-Key': key, 'X-EM-Agent-Source': 'agent', 'Content-Type': 'application/octet-stream' if isinstance(payload, bytes) else 'application/json'})
     with urllib.request.urlopen(request, timeout=120) as response:
         return response.read()
 

@@ -168,9 +168,9 @@ def convert(request_path):
         print('MinerU: ' + state, flush=True)
     save('uploading')
     transfer('PUT', data['file_urls'][0], source=source)
-    deadline = time.monotonic() + 840
     previous = None
-    while time.monotonic() < deadline:
+    # @spec SJT-001 — The shared job service owns manual timeout and Agent cancellation
+    while True:
         data = api('GET', '/extract-results/batch/' + batch_id)
         matches = [item for item in data.get('extract_result', [])
                    if item.get('data_id') == 'em-agent' or item.get('file_name') == config['document_name']]
@@ -195,7 +195,6 @@ def convert(request_path):
             print('EM_AGENT_MINERU_COMPLETE', flush=True)
             return
         time.sleep(5)
-    raise RuntimeError('MinerU conversion timed out')
 
 
 def verified_mineru(result, directory):

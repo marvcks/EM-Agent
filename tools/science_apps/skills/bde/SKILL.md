@@ -33,7 +33,9 @@ em-bde download JOB_ID ./bde-results
   This basis and protocol do not reproduce the paper's DFT dataset.
 - BDE = H(fragment 1) + H(fragment 2) − H(parent), in kcal/mol. Do not confuse
   electronic energy differences, free energies, measured BDEs or ML estimates.
-- Whole-job limit: 900 seconds, 8 cores, requested 8 GiB, 128 atoms with H.
+- Resource limits: 8 cores, requested 8 GiB, 128 atoms with H.
+  Agent submissions have no platform duration limit; monitor with `status` and
+  decide when to stop with `cancel`. The manual page retains its 900-second limit.
   Start with very small molecules for Psi4. Never interpret a partial/timed-out
   `progress.json` as a completed minimum across the molecule.
 - `molecule.png`, `bonds.csv`, `result.json`, `results.zip` and Psi4 structure/

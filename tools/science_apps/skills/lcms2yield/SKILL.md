@@ -16,4 +16,4 @@ em-reaction cancel JOB_ID
 em-reaction download JOB_ID ./cf-results
 ```
 
-使用官方 `20250721.pth`，CPU、隔离 Python。与手动页面共用串行队列，最多 8 核、申请 8 GB、15 分钟；申请内存不是硬隔离上限。查看 `result.json`、`correction_factors.csv` 或 `results.zip`，按输入 SMILES 一一对应报告 CF，并保留模型来源和适用范围。无效或不支持分子会失败，查看日志后更正，不编造结果。
+使用官方 `20250721.pth`，CPU、隔离 Python。与手动页面共用串行队列，最多 8 核、申请 8 GB；Agent 提交无平台总时长上限，使用 status 监控并自主决定何时 cancel，手动页面仍限 15 分钟；申请内存不是硬隔离上限。查看 `result.json`、`correction_factors.csv` 或 `results.zip`，按输入 SMILES 一一对应报告 CF，并保留模型来源和适用范围。无效或不支持分子会失败，查看日志后更正，不编造结果。

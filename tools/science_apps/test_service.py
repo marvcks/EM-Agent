@@ -1,6 +1,9 @@
 """Exercise the manual application contract without scientific licenses/models."""
 import asyncio
+from contextlib import redirect_stdout
+import io
 from pathlib import Path
+import runpy
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -12,6 +15,79 @@ WATER = '3\nwater\nO 0 0 0\nH 0.7586 0 0.5043\nH -0.7586 0 0.5043\n'
 
 
 class ScienceTests(unittest.TestCase):
+    # @spec SJT-001 — Agent submissions outlive the manual timeout and remain cancellable
+    def test_agent_jobs_have_no_platform_timeout(self):
+        async def exercise(root):
+            executable = root / 'fake-xtb'
+            executable.write_text('#!/bin/sh\nsleep 1\necho "normal termination of xtb"\n')
+            executable.chmod(0o755)
+            manager = Manager(root / 'jobs')
+            with patch('tools.science_apps.service.application_executable', return_value=str(executable)), \
+                    patch('tools.science_apps.service.TIMEOUT_SECONDS', 0.01):
+                job = manager.submit(JobRequest(app_id='xtb', xyz=WATER), source='agent')
+                await asyncio.wait_for(manager.run(job['id']), 4)
+                self.assertEqual(job['status'], 'succeeded')
+                self.assertIsNone(job['error'])
+                self.assertEqual(Manager(root / 'jobs').get(job['id'])['source'], 'agent')
+                executable.write_text('#!/bin/sh\nsleep 30\n')
+                job = manager.submit(JobRequest(app_id='xtb', xyz=WATER), source='agent')
+                runner = asyncio.create_task(manager.run(job['id']))
+                while manager.process is None:
+                    await asyncio.sleep(0.01)
+                await manager.cancel(job['id'])
+                await asyncio.wait_for(runner, 3)
+                self.assertEqual(job['status'], 'cancelled')
+                self.assertIsNone(manager.process)
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
+
+    # @spec SJT-001 — JSON and document submissions default to manual, CLI marks agent
+    def test_submission_source_for_both_endpoints(self):
+        with tempfile.TemporaryDirectory() as folder, \
+                patch('tools.science_apps.service.application_executable', return_value='/missing/tool'):
+            with TestClient(create_app(Path(folder), 'test-key')) as client:
+                for source in ['manual', 'agent']:
+                    headers = {'X-Session-API-Key': 'test-key'}
+                    if source == 'agent':
+                        headers['X-EM-Agent-Source'] = source
+                    catalog = client.get('/api/science/apps', headers=headers).json()
+                    self.assertTrue(all(app['timeout_seconds'] == (None if source == 'agent' else 900)
+                                        for app in catalog))
+                    response = client.post('/api/science/jobs', headers=headers,
+                                           json={'app_id': 'xtb', 'xyz': WATER})
+                    self.assertEqual(response.status_code, 201, response.text)
+                    self.assertEqual(response.json()['source'], source)
+                    response = client.post('/api/science/documents?filename=paper.pdf',
+                                           headers=headers, content=b'%PDF-1.4\nExample')
+                    self.assertEqual(response.status_code, 201, response.text)
+                    self.assertEqual(response.json()['source'], source)
+                headers['X-EM-Agent-Source'] = 'unknown'
+                self.assertEqual(client.post('/api/science/jobs', headers=headers,
+                    json={'app_id': 'xtb', 'xyz': WATER}).status_code, 422)
+
+    # @spec SJT-001 — Every bundled Agent CLI marks actual submission requests
+    def test_agent_cli_submission_headers(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'water.xyz').write_text(WATER)
+            (root / 'molecules.smi').write_text('CCO')
+            (root / 'paper.pdf').write_bytes(b'%PDF-1.4\nExample')
+            cases = [
+                ('em-bde', ['--smiles', 'CCO']),
+                ('em-magus', [str(root / 'water.xyz'), '--volume-min', '180', '--volume-max', '400']),
+                ('em-reaction', ['lcms2yield', str(root / 'molecules.smi')]),
+                ('em-mineru', [str(root / 'paper.pdf')]),
+            ]
+            for name, args in cases:
+                with self.subTest(cli=name), patch.dict('os.environ', {'LOCAL_BACKEND_API_KEY': 'test-key'}), \
+                        patch('sys.argv', [name, 'submit', *args]), redirect_stdout(io.StringIO()), \
+                        patch('urllib.request.urlopen', return_value=io.BytesIO(b'{}')) as opened:
+                    runpy.run_path(str(Path(__file__).parent / name), run_name='__main__')
+                    request = opened.call_args.args[0]
+                    self.assertEqual(request.get_method(), 'POST')
+                    self.assertEqual(request.get_header('X-em-agent-source'), 'agent')
+                    self.assertEqual(request.get_header('X-session-api-key'), 'test-key')
+
     def test_bde_only_publishes_complete_verified_results(self):
         async def exercise(root):
             executable = root / 'bde-model'
@@ -231,11 +307,14 @@ class ScienceTests(unittest.TestCase):
                 self.assertEqual(manager.detail(job['id'])['status'], 'failed')
                 self.assertIsNone(manager.detail(job['id'])['energy_hartree'])
                 executable.write_text('#!/bin/sh\nsleep 30\n')
-                job = manager.submit(JobRequest(app_id='xtb', xyz=WATER))
-                with patch('tools.science_apps.service.TIMEOUT_SECONDS', 0.01):
-                    await asyncio.wait_for(manager.run(job['id']), 3)
-                self.assertEqual(manager.detail(job['id'])['error'], 'timeout')
-                self.assertIsNone(manager.process)
+                for legacy in [False, True]:
+                    job = manager.submit(JobRequest(app_id='xtb', xyz=WATER))
+                    if legacy:
+                        job.pop('source')
+                    with patch('tools.science_apps.service.TIMEOUT_SECONDS', 0.01):
+                        await asyncio.wait_for(manager.run(job['id']), 3)
+                    self.assertEqual(manager.detail(job['id'])['error'], 'timeout')
+                    self.assertIsNone(manager.process)
             app = create_app(root / 'jobs', 'test-key')
             with TestClient(app) as client:
                 response = client.get('/api/science/jobs/' + job['id'] + '/files/input.xyz', headers={'X-Session-API-Key': 'test-key'})

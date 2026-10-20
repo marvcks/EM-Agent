@@ -65,7 +65,7 @@ describe("chat attachment upload", () => {
     store.files = [existingFile];
     validateFilesMock.mockReturnValue({
       isValid: false,
-      errorMessage: "Total size exceeds 3MB",
+      errorMessage: "Total size exceeds 100MB",
     });
     const { result } = renderHook(() => useChatAttachmentUpload());
 
@@ -76,7 +76,7 @@ describe("chat attachment upload", () => {
       [existingImage, existingFile],
     );
     expect(displayErrorToastMock).toHaveBeenCalledWith(
-      "Error: Total size exceeds 3MB",
+      "Error: Total size exceeds 100MB",
     );
     expect(processFilesMock).not.toHaveBeenCalled();
     expect(processImagesMock).not.toHaveBeenCalled();
