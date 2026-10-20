@@ -334,14 +334,16 @@ describe("Sidebar", () => {
     expect(sidebar.dataset.collapsed).toBe("false");
   });
 
-  it("shows the version tile above the backend selector when expanded", () => {
+  it("keeps the backend selector without promotional or update tiles when expanded", () => {
     renderSidebar("/conversations");
 
-    const versionTile = screen.getByTestId("agent-canvas-version-tile");
-    const backendSelector = screen.getByTestId("backend-selector");
-    expect(versionTile.compareDocumentPosition(backendSelector)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    expect(screen.getByTestId("backend-selector")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("agent-canvas-version-tile"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(translations["BRANDING$EM_NOTE"].en),
+    ).not.toBeInTheDocument();
   });
 
   it("hides the version tile when the sidebar is collapsed", () => {

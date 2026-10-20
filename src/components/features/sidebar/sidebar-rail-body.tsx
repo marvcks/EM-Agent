@@ -8,7 +8,6 @@ import {
   Plus,
   Server,
   Settings,
-  Sparkles,
 } from "lucide-react";
 import { OpenHandsLogoButton } from "#/components/shared/buttons/openhands-logo-button";
 import { NavigationLink } from "#/components/shared/navigation-link";
@@ -30,7 +29,6 @@ import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
 import { BackendSelector } from "#/components/features/backends/backend-selector";
 import { BackendStatusDot } from "#/components/features/backends/backend-status-dot";
 import { CommandMenuTrigger } from "#/components/features/command-menu/command-menu-trigger";
-import { AgentCanvasVersionTile } from "#/components/features/settings/agent-canvas-version-tile";
 import { SidebarConversationList } from "./sidebar-conversation-list";
 import { SidebarOnboardingChecklist } from "./sidebar-onboarding-checklist";
 import AutomationsIcon from "#/icons/automations.svg?react";
@@ -390,13 +388,6 @@ export function SidebarRailBody({
 
       {!collapsed ? (
         <>
-          <div className="em-workspace-note">
-            <Sparkles size={16} />
-            <div>
-              {t(I18nKey.BRANDING$EM_NOTE)}
-              <span>{t(I18nKey.BRANDING$EM_SCIENCE)}</span>
-            </div>
-          </div>
           <div className="mb-2 shrink-0 pr-2.5">
             <SidebarOnboardingChecklist collapsed={collapsed} />
           </div>
@@ -406,7 +397,6 @@ export function SidebarRailBody({
               "-ml-2.5 w-[calc(100%+0.625rem)] border-t border-border pt-2 px-2.5",
             )}
           >
-            <AgentCanvasVersionTile hideWhenUpToDate />
             <BackendSelector sidebarCollapsed={collapsed} openUpward />
           </div>
         </>

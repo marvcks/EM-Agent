@@ -36,9 +36,6 @@ import type { PluginSpec } from "#/api/conversation-service/agent-server-convers
 import { markAutomationSetupHandoff } from "#/api/automation-setup-handoff-store";
 import { PluginPickerModal } from "#/components/features/plugins/plugin-picker-modal";
 import { PluginPickerTrigger } from "#/components/features/plugins/plugin-picker-trigger";
-import { RecommendedAutomationsLauncher } from "#/components/features/automations/recommended-automations-launcher";
-import { PinnedAutomationsDashboard } from "./featured-automations/pinned-automations-dashboard";
-import { RunningAutomationsList } from "./featured-automations/running-automations-list";
 import { HomeHeaderTitle } from "./home-header/home-header-title";
 import {
   HomeLauncherModeToggle,
@@ -367,11 +364,6 @@ export function HomeChatLauncher() {
           />
         </div>
 
-        <div className="mt-8 flex w-full flex-col gap-8">
-          <RecommendedAutomationsLauncher variant="rail" />
-          <PinnedAutomationsDashboard />
-          <RunningAutomationsList />
-        </div>
         <p className="em-disclaimer">{t(I18nKey.BRANDING$EM_DISCLAIMER)}</p>
       </div>
 

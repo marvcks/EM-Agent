@@ -353,12 +353,8 @@ describe("HomeChatLauncher", () => {
       workspaces: [],
       workspaceParents: [],
     });
-    // The launcher mounts the pinned/running automation dashboards, whose
-    // queries would otherwise fire real axios XHRs into MSW. If such a
-    // request is still in flight when the file's jsdom environment is torn
-    // down, MSW's XHR interceptor throws `ReferenceError:
-    // XMLHttpRequestUpload is not defined` as an unhandled rejection.
-    // Mocking the underlying service keeps all automation traffic in-process.
+    // Spy on the underlying service to verify the simplified home does not
+    // fetch automation dashboards. Keep accidental requests in-process.
     vi.spyOn(AutomationService, "checkHealth").mockResolvedValue({
       status: "ok",
     });
@@ -407,9 +403,6 @@ describe("HomeChatLauncher", () => {
       "data-placeholder",
       "HOME$AUTOMATE_PROMPT_PLACEHOLDER",
     );
-    expect(
-      screen.getByTestId("recommended-automations-rail"),
-    ).toBeInTheDocument();
   });
 
   it("creates a conversation with just the typed query and navigates when no workspace is selected", async () => {
@@ -863,14 +856,25 @@ describe("HomeChatLauncher", () => {
     },
   );
 
-  it("renders the recommended automations rail above pinned activity in Automate mode", async () => {
-    renderLauncher();
-    const user = userEvent.setup();
+  it.each(["code", "automate"])(
+    "keeps the %s home focused on the composer without automation dashboards",
+    async (mode) => {
+      renderLauncher();
+      const user = userEvent.setup();
 
-    await user.click(screen.getByTestId("home-launcher-mode-automate"));
+      await user.click(screen.getByTestId(`home-launcher-mode-${mode}`));
 
-    expect(
-      screen.getByTestId("recommended-automations-rail"),
-    ).toBeInTheDocument();
-  });
+      expect(
+        screen.queryByTestId("recommended-automations-rail"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("pinned-automations-dashboard"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("running-automations-list"),
+      ).not.toBeInTheDocument();
+      expect(AutomationService.checkHealth).not.toHaveBeenCalled();
+      expect(AutomationService.getAutomations).not.toHaveBeenCalled();
+    },
+  );
 });

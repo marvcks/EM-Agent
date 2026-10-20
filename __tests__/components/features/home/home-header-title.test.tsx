@@ -4,10 +4,12 @@ import { renderWithProviders } from "test-utils";
 import { HomeHeaderTitle } from "#/components/features/home/home-header/home-header-title";
 
 describe("HomeHeaderTitle", () => {
-  it("frames the splash copy around engineering work, not greenfield building", () => {
+  it("renders a welcome heading followed by supporting copy", () => {
     renderWithProviders(<HomeHeaderTitle />);
 
-    expect(screen.getByText("HOME$WHAT_TO_WORK_ON")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "HOME$WHAT_TO_WORK_ON" }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("home-header-subtitle")).toHaveTextContent(
       "HOME$ENGINEERING_TASKS_SUBHEADER",
     );

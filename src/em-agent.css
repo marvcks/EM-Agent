@@ -18,19 +18,13 @@ aside[data-collapsed="false"] [data-testid="sidebar-conversations-link"] { backg
 .em-topbar { height: 58px; min-height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 38px; border-bottom: 1px solid var(--oh-border-subtle); font-size: 11px; color: var(--oh-text-dim); }
 .em-topbar > div > span { margin: 0 12px; opacity: .5; }
 .em-space-label { font-size: 10px; }
-.em-workspace-note { display: flex; gap: 10px; align-items: center; margin: 12px 10px 16px 0; padding: 13px 12px; background: var(--oh-interactive-hover-low); border: 1px solid var(--oh-border); border-radius: 9px; font-size: 11px; color: var(--oh-muted); }
-.em-workspace-note > svg { color: var(--oh-color-primary); flex-shrink: 0; }
-.em-workspace-note span { display: block; margin-top: 4px; font-size: 8px; letter-spacing: .15em; color: var(--oh-text-dim); }
 [data-testid="sidebar-onboarding-checklist"] ul { max-height: 128px; overflow-y: auto; }
 [data-testid="conversation-panel"] { margin-top: 22px; border-top: 1px solid var(--oh-border); padding-top: 10px; }
 [data-testid="older-conversations-summary"] { font-size: 12px; }
 [data-testid="home-chat-launcher"] { padding-top: max(36px, 8vh); }
 [data-testid="home-chat-launcher"] > div:first-child { max-width: 760px; gap: 20px; }
 .em-welcome { padding: 0 15px 26px; }
-.em-welcome-orbit { position: relative; display: grid; place-items: center; width: 78px; height: 78px; border-radius: 50%; background: var(--oh-interactive-selected); color: var(--oh-color-primary); margin-bottom: 26px; }
-.em-welcome-orbit::after { content: ""; position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--oh-color-primary); right: 1px; top: 12px; box-shadow: 0 0 0 5px var(--oh-color-base); }
-.em-eyebrow { font-size: 9px; letter-spacing: .23em; color: var(--oh-text-dim); margin-bottom: 13px; }
-.em-welcome h1 { font-family: "Songti SC", STSong, SimSun, Georgia, serif; font-size: clamp(32px, 3.5vw, 53px); line-height: 1.5; letter-spacing: .08em; font-weight: 600; }
+.em-welcome h1 { font-family: "Songti SC", STSong, SimSun, Georgia, serif; font-size: clamp(26px, 2.7vw, 36px); line-height: 1.5; letter-spacing: .01em; text-wrap: balance; font-weight: 600; }
 [data-testid="home-header-subtitle"] { font-size: 12px; margin-top: 14px; line-height: 1.9; }
 .em-composer { border: 1px solid var(--oh-border-input); background: var(--oh-surface); border-radius: 15px; box-shadow: 0 8px 32px #263c5708; }
 .em-composer:focus-within { border-color: var(--oh-focus); box-shadow: 0 0 0 3px #426fac10; }
@@ -47,8 +41,7 @@ aside[data-collapsed="false"] [data-testid="sidebar-conversations-link"] { backg
 @media (max-width: 767px) {
   .em-topbar { display: none; }
   .em-welcome { padding: 0 0 16px; }
-  .em-welcome h1 { font-size: 32px; letter-spacing: .02em; }
-  .em-welcome-orbit { width: 64px; height: 64px; margin-bottom: 20px; }
+  .em-welcome h1 { font-size: 28px; }
   [data-testid="home-header-subtitle"] { font-size: 11px; max-width: 270px; margin-top: 10px; }
   [data-testid="home-chat-launcher"] { padding-top: 28px; }
   [data-testid="home-chat-launcher"] > div:first-child { gap: 16px; }
