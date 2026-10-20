@@ -26,9 +26,7 @@ export function ConversationLoading({ className }: ConversationLoadingProps) {
         as="p"
         role="status"
         aria-live="polite"
-        className="block w-full text-center text-base font-normal leading-5"
-        duration={1}
-        spread={2}
+        className="text-center text-base font-normal leading-5"
       >
         {t(I18nKey.HOME$LOADING)}
       </TextShimmer>

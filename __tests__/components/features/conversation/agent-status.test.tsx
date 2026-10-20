@@ -137,6 +137,56 @@ afterEach(() => {
 });
 
 describe("AgentStatus", () => {
+  // @spec TSH-001 — Shimmer follows the existing Agent lifecycle
+  it.each([
+    [AgentState.FINISHED, ExecutionStatus.FINISHED],
+    [AgentState.STOPPED, ExecutionStatus.PAUSED],
+    [AgentState.PAUSED, ExecutionStatus.PAUSED],
+    [AgentState.AWAITING_USER_INPUT, ExecutionStatus.IDLE],
+    [
+      AgentState.AWAITING_USER_CONFIRMATION,
+      ExecutionStatus.WAITING_FOR_CONFIRMATION,
+    ],
+    [AgentState.ERROR, ExecutionStatus.ERROR],
+  ])(
+    "restores static text after running transitions to %s",
+    (agentState, executionStatus) => {
+      const { handleStop, handleResumeAgent, rerender } = renderAgentStatus({
+        agentState: AgentState.RUNNING,
+        executionStatus: ExecutionStatus.RUNNING,
+      });
+      const label = screen.getByText(I18nKey.AGENT_STATUS$RUNNING_TASK);
+      expect(label).toHaveAttribute("data-shimmer-active", "true");
+
+      agentStatusMocks.useAgentState.mockReturnValue({
+        curAgentState: agentState,
+        executionStatus,
+      });
+      rerender(
+        <AgentStatus
+          handleStop={handleStop}
+          handleResumeAgent={handleResumeAgent}
+        />,
+      );
+
+      expect(label).toBeInTheDocument();
+      expect(label).toHaveAttribute("data-shimmer-active", "false");
+    },
+  );
+
+  it("stops shimmering as soon as a stop request is pending", () => {
+    renderAgentStatus({
+      agentState: AgentState.RUNNING,
+      executionStatus: ExecutionStatus.RUNNING,
+      isPausing: true,
+    });
+
+    expect(screen.getByText(I18nKey.AGENT_STATUS$RUNNING_TASK)).toHaveAttribute(
+      "data-shimmer-active",
+      "false",
+    );
+  });
+
   it.each([
     {
       label: "the runtime is initializing",

@@ -298,9 +298,7 @@ export function ChatMessage({
             role="status"
             aria-live="polite"
             data-testid="chat-message-sending"
-            className="block w-full text-sm font-normal"
-            duration={1}
-            spread={2}
+            className="text-sm font-normal"
           >
             {t(I18nKey.CHAT_INTERFACE$MESSAGE_SENDING)}
           </TextShimmer>

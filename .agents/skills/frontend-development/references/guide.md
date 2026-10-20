@@ -1,3 +1,13 @@
+## Agent text shimmer
+
+`TextShimmer` owns the shared glyph-only sweep in `src/tailwind.css`. Its `active`
+prop changes paint without replacing the element. `AgentStatus` derives it from
+the existing running status and disables it immediately during a pending stop;
+finished, paused, idle, confirmation and error labels stay static. Keep loading
+and sending labels sized to their text so the highlight crosses the glyphs at
+the intended cadence. Reduced-motion and forced-colors fallbacks belong in CSS
+so they also work before hydration. See `specs/text-shimmer.md`.
+
 ## Inline-style rollout
 
 `shadcn/no-inline-styles` runs at warning severity across source, including UI

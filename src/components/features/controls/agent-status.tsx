@@ -20,6 +20,7 @@ import { useTaskPolling } from "#/hooks/query/use-task-polling";
 import { useSubConversationTaskPolling } from "#/hooks/query/use-sub-conversation-task-polling";
 import { useAgentNotification } from "#/hooks/use-agent-notification";
 import { I18nKey } from "#/i18n/declaration";
+import { TextShimmer } from "#/components/shared/text-shimmer";
 
 export interface AgentStatusProps {
   className?: string;
@@ -146,12 +147,19 @@ export function AgentStatus({
         className,
       )}
     >
-      <span
+      {/* @spec TSH-001 — Only a running Agent animates; stopping resets immediately. */}
+      <TextShimmer
+        as="span"
+        active={
+          shouldShownAgentStop &&
+          !isLoading &&
+          statusCode === I18nKey.AGENT_STATUS$RUNNING_TASK
+        }
         className="text-[11px] text-muted font-normal leading-5 min-w-0 max-w-full truncate"
         title={t(statusCode)}
       >
         {t(statusCode)}
-      </span>
+      </TextShimmer>
       <div
         className={cn(
           "box-border content-stretch flex flex-row gap-0.75 items-center justify-center overflow-clip px-0.5 py-1 relative rounded-[100px] shrink-0 size-6 transition-all duration-200 active:scale-95 bg-transparent text-muted hover:bg-contrast/10 hover:text-contrast",

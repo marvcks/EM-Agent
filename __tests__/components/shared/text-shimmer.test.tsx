@@ -1,30 +1,36 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { TextShimmer } from "#/components/shared/text-shimmer";
 
-vi.mock("framer-motion", async () => {
-  const actual = await vi.importActual<typeof import("framer-motion")>(
-    "framer-motion",
-  );
-  return {
-    ...actual,
-    useReducedMotion: () => false,
-  };
-});
-
 describe("TextShimmer", () => {
-  it("renders with a clipped dual-layer shimmer background", () => {
-    render(
-      <TextShimmer data-testid="shimmer" duration={3} spread={2}>
-        Sending...
+  // @spec TSH-001 — Disabling shimmer restores the same text element
+  it("stops and restarts on the same accessible text element", () => {
+    const { rerender } = render(
+      <TextShimmer as="span" role="status" title="Agent status">
+        Working
+      </TextShimmer>,
+    );
+    const label = screen.getByRole("status");
+    expect(label).toHaveAttribute("data-shimmer-active", "true");
+
+    rerender(
+      <TextShimmer as="span" role="status" title="Agent status" active={false}>
+        Finished
       </TextShimmer>,
     );
 
-    const shimmer = screen.getByTestId("shimmer");
-    expect(shimmer.style.backgroundImage).toContain("repeating-linear-gradient");
-    expect(shimmer.style.backgroundImage).toContain("var(--oh-foreground)");
-    expect(shimmer.style.backgroundImage).toContain("var(--oh-muted)");
-    expect(shimmer.style.backgroundSize).toBe("200% 100%");
-    expect(shimmer.style.animation).toContain("oh-text-shimmer-");
+    expect(screen.getByRole("status")).toBe(label);
+    expect(label).toHaveTextContent("Finished");
+    expect(label).toHaveAttribute("title", "Agent status");
+    expect(label).toHaveAttribute("data-shimmer-active", "false");
+
+    rerender(
+      <TextShimmer as="span" role="status" active>
+        Working again
+      </TextShimmer>,
+    );
+
+    expect(screen.getByRole("status")).toBe(label);
+    expect(label).toHaveAttribute("data-shimmer-active", "true");
   });
 });
