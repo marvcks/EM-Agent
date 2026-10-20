@@ -180,6 +180,24 @@ describe("FilesTab", () => {
     expect(secondTab).toHaveClass("border-r");
   });
 
+  // @spec MOL-001 — A third preview mode beside Rich and Plain
+  it("lets users select molecular mode and explains unsupported files", async () => {
+    openFile("README.md", "molecular-mode");
+    renderTab("molecular-mode");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("radio", { name: "FILES$MOLECULAR" }));
+    expect(
+      screen.getByRole("radio", { name: "FILES$MOLECULAR" }),
+    ).toBeChecked();
+    expect(
+      await screen.findByText("FILES$MOLECULAR_UNSUPPORTED"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "FILES$PLAIN" }));
+    expect(
+      await screen.findByTestId("file-content-viewer-highlighted"),
+    ).toBeInTheDocument();
+  });
+
   it("renders the binary fallback in plain mode for binary files", async () => {
     useWorkspaceFileContentMock.mockReturnValue({
       data: {

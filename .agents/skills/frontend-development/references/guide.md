@@ -189,3 +189,21 @@ When adding code that needs a new string, decide up front which rule it falls un
 
 
 - ESLint config (flat, ESLint 9): the project uses `eslint.config.js` (not `.eslintrc`) and runs on `eslint@9.x`, not 10. The constraint pinning us below 10 is `eslint-plugin-react@7.37.x`, which still calls `context.getFilename()` at rule-load time — that API was removed in ESLint 10 and `@eslint/compat`'s `fixupPluginRules` does NOT shim it. Don't try to bump eslint past 9 until eslint-plugin-react ships a v10-compatible release. Import rules come from `eslint-plugin-import-x` (the maintained fork of `eslint-plugin-import`) but are registered under both `import-x/` and `import/` prefixes via `plugins: { import: importXPlugin, ... }` so existing `// eslint-disable-next-line import/...` directives keep working. `linterOptions.reportUnusedDisableDirectives` is set to `"warn"` (not "off") so stale airbnb-era disable comments still surface in lint output without failing CI. The TS-overrides block has an `ignores: ["src/hooks/query/query-keys.ts"]` so the `no-restricted-syntax` rule banning raw `["settings", ...]` query keys doesn't fire on the file that defines the helpers themselves. No `.npmrc` / `legacy-peer-deps` flag is needed — all our plugins declare ESLint 9 peer compatibility.
+
+- Molecular workspace previews (`specs/molecular-file-preview.md`, MOL-001–003):
+  `molecular` shares the conversation-owned `filesTabContentViewMode` preference
+  with Rich/Plain; keep its hydration allow-list in sync. The molecular component
+  is lazy-loaded and consumes already-authenticated workspace text, with no new
+  API or remote annotation requests. Mol* owns parsing/rendering; distinguish
+  crystal CIF from mmCIF, expand crystal unit-cell symmetry, and disclose that
+  only the first model is shown. Each preview owns its canvas; detach on cleanup,
+  ignore late callbacks, dispose after active tasks settle, and resize with the
+  panel. Keep unsupported files and WebGL/parse failures recoverable in text mode.
+  The app's `vendor-molstar` group in `vite.config.ts` must retain Mol*'s cyclic
+  internal graph as one lazy vendor chunk: generic size splitting causes
+  `Cannot read properties of undefined (reading 'Schema')` in the production
+  build. Validate a real built-app structure preview after changing this group.
+  Keep each canvas in an owned parent until Mol* disposal completes (its
+  ResizeObserver cleanup reads `canvas.parentElement`); detach that parent
+  from the preview immediately. Allow the preview-mode toolbar to wrap in
+  narrow panes so all three options and the external-file link stay reachable.

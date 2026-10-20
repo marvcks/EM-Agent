@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
 import { I18nKey } from "#/i18n/declaration";
@@ -13,6 +14,11 @@ import { COLOR_THEMES } from "#/themes/color-themes";
 import { cn } from "#/utils/utils";
 import { HighlightedSourceView } from "./highlighted-source-view";
 import type { ViewMode } from "./view-mode";
+import { getMolecularFileFormat } from "./molecular-file-format";
+
+const MolecularStructureViewer = lazy(
+  () => import("./molecular-structure-viewer"),
+);
 
 interface FileContentViewerProps {
   path: string;
@@ -109,6 +115,34 @@ export function FileContentViewer({ path, viewMode }: FileContentViewerProps) {
 
   const { kind, text, staticUrl, mimeType } = query.data;
   const bustedStaticUrl = withWorkspaceCacheBuster(staticUrl, mutationCounter);
+
+  // @spec MOL-001 — Load Mol* only when the molecular preview is selected
+  if (viewMode === "molecular") {
+    if (!getMolecularFileFormat(path) || kind !== "text" || text === null) {
+      return (
+        <div
+          role="status"
+          className="flex h-full w-full items-center justify-center p-6 text-sm text-muted"
+        >
+          {t(I18nKey.FILES$MOLECULAR_UNSUPPORTED)}
+        </div>
+      );
+    }
+    return (
+      <Suspense
+        fallback={
+          <div
+            role="status"
+            className="flex h-full w-full items-center justify-center text-sm text-muted"
+          >
+            {t(I18nKey.FILES$MOLECULAR_LOADING)}
+          </div>
+        }
+      >
+        <MolecularStructureViewer path={path} text={text} />
+      </Suspense>
+    );
+  }
 
   // ----- Plain mode: raw source bytes, syntax-highlighted when we can
   // recognize the grammar (falls through to a `<pre>` otherwise). This

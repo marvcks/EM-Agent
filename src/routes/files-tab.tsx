@@ -228,14 +228,19 @@ function FilesTab() {
             >
               {selectedPath ? (
                 <>
-                  <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border">
+                  <div className="flex flex-wrap items-center gap-3 px-3 py-1.5 border-b border-border">
                     <SegmentedToggle<ViewMode>
                       ariaLabel={t(I18nKey.FILES$RICH)}
                       testId="files-tab-content-mode-toggle"
+                      className="min-w-0 flex-wrap"
                       value={contentViewMode}
                       options={[
                         { value: "rich", label: t(I18nKey.FILES$RICH) },
                         { value: "plain", label: t(I18nKey.FILES$PLAIN) },
+                        {
+                          value: "molecular",
+                          label: t(I18nKey.FILES$MOLECULAR),
+                        },
                       ]}
                       onChange={setFilesTabContentViewMode}
                     />

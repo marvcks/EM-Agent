@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -44,6 +44,11 @@ vi.mock("#/api/runtime-service/agent-server-runtime-service", () => ({
   default: { downloadFile: vi.fn() },
 }));
 
+const createMolstarViewerMock = vi.fn();
+vi.mock("#/components/features/files-tab/molstar-viewer", () => ({
+  createMolstarViewer: (...args: unknown[]) => createMolstarViewerMock(...args),
+}));
+
 const fetchMock = vi.fn();
 
 const BASE_URL =
@@ -64,6 +69,13 @@ describe("FileContentViewer", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
     fetchMock.mockReset();
+    createMolstarViewerMock.mockReset();
+    createMolstarViewerMock.mockReturnValue({
+      ready: Promise.resolve(),
+      reset: vi.fn(),
+      resize: vi.fn(),
+      dispose: vi.fn(),
+    });
     useWorkspaceSessionMock.mockReset();
     useActiveConversationMock.mockReset();
     useRuntimeIsReadyMock.mockReset();
@@ -93,6 +105,38 @@ describe("FileContentViewer", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+
+  // @spec MOL-001 — Render fetched workspace bytes only in molecular mode
+  it.each(["plain", "molecular"] as const)(
+    "loads a structure file through the existing workspace service in %s mode",
+    async (mode) => {
+      const text = "3\nwater\nO 0 0 0\nH 0.76 0 0.59\nH -0.76 0 0.59\n";
+      fetchMock.mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => new TextEncoder().encode(text).buffer,
+      });
+      renderViewer("water.xyz", mode);
+      if (mode === "plain") {
+        expect(
+          await screen.findByTestId("file-content-viewer-plain"),
+        ).toHaveTextContent("water");
+        expect(createMolstarViewerMock).not.toHaveBeenCalled();
+      } else {
+        await waitFor(() =>
+          expect(createMolstarViewerMock).toHaveBeenCalledWith(
+            expect.any(HTMLDivElement),
+            "water.xyz",
+            text,
+          ),
+        );
+      }
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE_URL}water.xyz`,
+        expect.objectContaining({ credentials: "include" }),
+      );
+    },
+  );
 
   // The acceptance criteria require the clear message in BOTH view modes. The
   // plain-mode fallback and the rich-mode binary branch both route through

@@ -605,6 +605,16 @@ describe("conversation localStorage utilities", () => {
       expect(JSON.parse(raw as string).filesTabContentViewMode).toBe("plain");
     });
 
+    // @spec MOL-001 — Persist the molecular preview choice
+    it("round-trips molecular mode through conversation storage", () => {
+      setConversationState("molecular-conversation", {
+        filesTabContentViewMode: "molecular",
+      });
+      expect(
+        getConversationState("molecular-conversation").filesTabContentViewMode,
+      ).toBe("molecular");
+    });
+
     it("round-trips 'rich' through localStorage (explicit save, not default)", () => {
       const conversationId = "files-view-conv-3";
       setConversationState(conversationId, {

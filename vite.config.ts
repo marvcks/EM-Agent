@@ -88,6 +88,14 @@ const appBuildConfig = {
             test: /node_modules[\\/](react-syntax-highlighter[\\/]|refractor[\\/]|lowlight[\\/]|highlight\.js[\\/]|hastscript[\\/]|(hast|mdast|unist|micromark|remark|rehype)[^\\/]*[\\/]|unified[\\/]|vfile[^\\/]*[\\/]|property-information[\\/]|(comma|space)-separated-tokens[\\/]|character-entities[^\\/]*[\\/]|(parse|stringify)-entities[\\/]|decode-named-character-reference[\\/]|bail[\\/]|trough[\\/]|is-plain-obj[\\/]|zwitch[\\/]|longest-streak[\\/]|ccount[\\/]|escape-string-regexp[\\/]|markdown-table[\\/]|devlop[\\/])/,
           },
           {
+            // Mol* has a cyclic internal module graph (schemas, model formats,
+            // transforms). Keep it together so size splitting cannot evaluate
+            // a schema before its data-column module has initialized. It stays
+            // behind the molecular preview's dynamic import.
+            name: "vendor-molstar",
+            test: /node_modules[\\/]molstar[\\/]/,
+          },
+          {
             name: "vendor",
             test: /node_modules[\\/]/,
             maxSize: APP_CHUNK_MAX_BYTES,

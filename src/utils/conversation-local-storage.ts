@@ -101,7 +101,11 @@ const REMOVED_CONVERSATION_TABS: ReadonlySet<string> = new Set([
   "vscode",
 ]);
 
-const VALID_VIEW_MODES: ReadonlySet<ViewMode> = new Set(["rich", "plain"]);
+const VALID_VIEW_MODES: ReadonlySet<ViewMode> = new Set([
+  "rich",
+  "plain",
+  "molecular",
+]);
 
 function sanitizeStoredState(
   stored: Record<string, unknown>,

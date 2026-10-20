@@ -1,1 +1,1 @@
-export type ViewMode = "rich" | "plain";
+export type ViewMode = "rich" | "plain" | "molecular";
