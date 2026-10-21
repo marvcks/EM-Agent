@@ -18,7 +18,7 @@ aside[data-collapsed="false"] [data-testid="sidebar-conversations-link"] { backg
 [data-testid="sidebar-onboarding-checklist"] ul { max-height: 128px; overflow-y: auto; }
 [data-testid="conversation-panel"] { margin-top: 22px; border-top: 1px solid var(--oh-border); padding-top: 10px; }
 [data-testid="older-conversations-summary"] { font-size: 12px; }
-[data-testid="home-chat-launcher"] { padding-top: max(36px, 8vh); }
+[data-testid="home-chat-launcher"] { padding-top: clamp(72px, 16vh, 160px); }
 [data-testid="home-chat-launcher"] > div:first-child { max-width: 760px; gap: 20px; }
 .em-welcome { padding: 0 15px 26px; }
 .em-welcome h1 { font-family: "Songti SC", STSong, SimSun, Georgia, serif; font-size: clamp(26px, 2.7vw, 36px); line-height: 1.5; letter-spacing: .01em; text-wrap: balance; font-weight: 600; }
