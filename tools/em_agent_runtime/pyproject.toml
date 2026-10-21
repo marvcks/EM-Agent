@@ -1,0 +1,23 @@
+[project]
+name = "em-agent-analysis"
+version = "1.0.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pip==25.2",
+    "numpy==2.2.6",
+    "scipy==1.15.3",
+    "pandas==2.2.3",
+    "matplotlib==3.10.3",
+    "scikit-learn==1.7.2",
+    "rdkit==2025.3.6",
+    "ase==3.26.0",
+    "spglib==2.6.0",
+    "pypdf==6.1.1",
+    "PyMuPDF==1.26.5",
+    "pdfplumber==0.11.7",
+    "openpyxl==3.1.5",
+    "python-docx==1.2.0",
+]
+
+[tool.uv]
+package = false

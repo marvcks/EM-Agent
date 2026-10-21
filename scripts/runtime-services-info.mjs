@@ -22,6 +22,7 @@
  */
 
 import process from "node:process";
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 /**
@@ -157,6 +158,14 @@ export function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
     switch (flag) {
+      case "--agent-environment-file":
+        if (!argv[i + 1])
+          throw new Error("--agent-environment-file needs a path");
+        options.agentEnvironmentDescription = readFileSync(
+          argv[++i],
+          "utf8",
+        ).trim();
+        break;
       case "--mode":
         options.mode = argv[++i];
         break;
@@ -191,7 +200,12 @@ const isMainModule =
 if (isMainModule) {
   try {
     const options = parseArgs(process.argv.slice(2));
-    process.stdout.write(JSON.stringify(buildRuntimeServicesInfo(options)));
+    const info = buildRuntimeServicesInfo(options);
+    // @spec AR-003 — Reuse the existing prompt metadata, without a new API field.
+    if (options.agentEnvironmentDescription) {
+      info.services.agent_server.description += ` ${options.agentEnvironmentDescription}`;
+    }
+    process.stdout.write(JSON.stringify(info));
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);

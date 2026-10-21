@@ -31,6 +31,18 @@ services:
 
 
 class DeploymentTests(unittest.TestCase):
+    # @spec AR-004 — Analysis runtime and Claude sessions survive recreation
+    def test_analysis_runtime_has_independent_readonly_mount_and_persistent_claude_state(self):
+        result = deploy.render_compose(COMPOSE, NEW_IMAGE, analysis_tools=True)
+        self.assertIn('/opt/em-agent-tools/analysis:/opt/em-agent-tools/analysis:ro', result)
+        self.assertIn('./claude-state:/home/openhands/.claude', result)
+        self.assertEqual(deploy.render_compose(result, NEW_IMAGE, analysis_tools=True), result)
+        rollback = deploy.render_compose(COMPOSE, OLD_IMAGE, remove_frontend=False)
+        self.assertNotIn('/opt/em-agent-tools/analysis:', rollback)
+        self.assertIn('./claude-state:/home/openhands/.claude', rollback)
+        with self.assertRaises(ValueError):
+            deploy.render_compose(COMPOSE.replace('    volumes:\n', '    volumes:\n      - /other:/opt/em-agent-tools/analysis:ro\n'), NEW_IMAGE, analysis_tools=True)
+
     def test_bde_mounts_are_independent_idempotent_and_preserve_rollback(self):
         result = deploy.render_compose(COMPOSE, NEW_IMAGE, bde_tools=True)
         self.assertIn('/opt/em-agent-tools/bde:/opt/em-agent-tools/bde:ro', result)

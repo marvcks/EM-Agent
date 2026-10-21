@@ -1,5 +1,9 @@
 # 从 fork 的指定提交部署 EM-Agent
 
+分析环境与 Claude Code ACP 用户技能接入见
+[持久化分析运行时](em-agent-analysis-runtime.md)。带 `io.em-agent.analysis=1`
+的镜像发布前须安装对应锁文件的分析环境；部署器保留 Claude 状态并检查运行时散列。
+
 生产代码来源为 `https://github.com/marvcks/EM-Agent`，开发分支为
 `codex/em-agent-ui`。每个部署使用完整 Git 提交号及不可变的本地镜像 ID，
 不使用 `latest` 选择线上版本。

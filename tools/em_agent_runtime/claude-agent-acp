@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+/usr/local/bin/python /opt/agent-canvas/em_agent_runtime/runtime.py sync-claude-skills
+exec /usr/local/bin/claude-agent-acp.upstream "$@"

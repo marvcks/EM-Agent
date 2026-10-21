@@ -22,14 +22,25 @@ LABEL io.em-agent.upstream.revision="f07aebdf5cdd71f4a05ebcf30f8bef5e4e3b70b9"
 LABEL io.em-agent.magus="1"
 LABEL io.em-agent.reactions="1"
 LABEL io.em-agent.bde="1"
+LABEL io.em-agent.analysis="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${SOURCE_COMMIT}
 USER root
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils \
+ && dpkg-query -W poppler-utils > /opt/em-agent/pdf-runtime.txt \
+ && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /opt/agent-canvas/frontend
 COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
 COPY --from=frontend-build /build/release.json /opt/em-agent/release.json
 ENV EM_AGENT_SCIENCE_APPS=1
 COPY docker/entrypoint.sh /opt/agent-canvas/entrypoint.sh
+COPY scripts/runtime-services-info.mjs /opt/agent-canvas/runtime-services-info.mjs
+COPY tools/em_agent_runtime/ /opt/agent-canvas/em_agent_runtime/
+RUN mv /usr/local/bin/claude-agent-acp /usr/local/bin/claude-agent-acp.upstream \
+ && install -m 755 /opt/agent-canvas/em_agent_runtime/claude-agent-acp /usr/local/bin/claude-agent-acp \
+ && install -m 755 /opt/agent-canvas/em_agent_runtime/em-env /usr/local/bin/em-env \
+ && ln -s /opt/agent-canvas/em_agent_runtime/task-shell.sh /etc/profile.d/em-agent-analysis.sh \
+ && printf '\n. /opt/agent-canvas/em_agent_runtime/task-shell.sh\n' >> /etc/bash.bashrc
 RUN chmod 755 /opt/agent-canvas/entrypoint.sh
 COPY tools/science_apps/ /opt/agent-canvas/science_apps/
 RUN install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magus-mace \

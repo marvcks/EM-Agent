@@ -310,6 +310,19 @@ if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ]; then
 fi
 AGENT_SERVER_IMPORT_MODULES="canvas_ui_tool"
 
+# @spec AR-001 — Select task Python in child shells, never in service processes.
+# The current entrypoint shell keeps its original PATH; BASH_ENV is read only
+# by later non-interactive bash processes (including ACP task terminals).
+AGENT_ENVIRONMENT_ARGS=()
+if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ] && [ -f /opt/agent-canvas/em_agent_runtime/task-shell.sh ]; then
+  test -x /opt/em-agent-tools/analysis/.venv/bin/python
+  export EM_AGENT_ANALYSIS_ENV=/opt/em-agent-tools/analysis/.venv
+  export BASH_ENV=/opt/agent-canvas/em_agent_runtime/task-shell.sh
+  mkdir -p "$OPENHANDS_DIR/runtime"
+  /usr/local/bin/python /opt/agent-canvas/em_agent_runtime/runtime.py describe > "$OPENHANDS_DIR/runtime/environment.txt"
+  AGENT_ENVIRONMENT_ARGS=(--agent-environment-file "$OPENHANDS_DIR/runtime/environment.txt")
+fi
+
 # Track child PIDs so we can clean up on exit.
 PIDS=()
 
@@ -433,7 +446,8 @@ RUNTIME_SERVICES_INFO="$(node /opt/agent-canvas/runtime-services-info.mjs \
   --mode docker \
   --agent-host-alias 127.0.0.1 \
   --agent-server-url "$AGENT_SERVER_URL" \
-  --automation-url "$AUTOMATION_BASE_URL")"
+  --automation-url "$AUTOMATION_BASE_URL" \
+  "${AGENT_ENVIRONMENT_ARGS[@]}")"
 
 # EFFECTIVE_SESSION_KEY is set above from LOCAL_BACKEND_API_KEY or the persisted api-key.txt.
 # Binding every interface is required so Docker published ports can reach the

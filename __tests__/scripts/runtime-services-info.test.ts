@@ -1,6 +1,9 @@
 // @vitest-environment node
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -109,6 +112,38 @@ describe("runtime-services-info.mjs", () => {
   });
 
   describe("CLI", () => {
+    // @spec AR-003 — Deployment inventory reaches existing runtime metadata
+    it("includes a runtime inventory file without changing the server URL", () => {
+      const directory = mkdtempSync(join(tmpdir(), "em-agent-inventory-"));
+      try {
+        const inventory = join(directory, "environment.txt");
+        writeFileSync(
+          inventory,
+          "Analysis Python: /persistent/analysis/bin/python",
+        );
+        const stdout = execFileSync(
+          process.execPath,
+          [
+            SCRIPT_PATH,
+            "--agent-server-url",
+            "http://127.0.0.1:18000",
+            "--agent-environment-file",
+            inventory,
+          ],
+          { encoding: "utf8" },
+        );
+        const info = JSON.parse(stdout);
+        expect(info.services.agent_server.description).toContain(
+          "/persistent/analysis/bin/python",
+        );
+        expect(info.services.agent_server.url_from_agent).toBe(
+          "http://127.0.0.1:18000",
+        );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
     // This is the exact path docker/entrypoint.sh relies on: run the module
     // directly and capture the JSON it prints to stdout.
     it("emits valid <RUNTIME_SERVICES> JSON on stdout", () => {

@@ -140,3 +140,28 @@ bound; retain the smaller JSON limit for other science endpoints. Its standard-
 library runner reads the credential from the existing persistent data mount
 (`~/.openhands/mineru/api-token`), not a frontend variable. It shares job lifecycle
 and cancellation, but the upstream cloud task may continue after local stop.
+
+### EM-Agent analysis environment and native ACP skills
+
+The fork image's `io.em-agent.analysis=1` requires the locked, read-only runtime
+at `/opt/em-agent-tools/analysis` plus its shared Python mount. Install it with
+`scripts/em-agent/install-analysis-runtime.sh`; never install analysis packages
+into Agent Server Python. The deployer compares the runtime lock manifest with
+the candidate image and persists `.claude` state alongside existing mounts.
+
+`task-shell.sh` is sourced by interactive bash and by child bash via `BASH_ENV`.
+It selects analysis only when no explicit `VIRTUAL_ENV` is active. Do not prepend
+analysis to the entrypoint/service PATH: services must retain the base Python.
+`em-env` queries the actual analysis interpreter. Its inventory is included in
+the existing agent-server description in runtime metadata, so inline/profile
+and OpenHands/ACP conversations receive it without a new SDK contract.
+
+The Claude ACP launcher projects user AgentSkills from `~/.openhands/skills`
+into the native Claude skill directory at process start. Respect
+`CLAUDE_CONFIG_DIR`, Canvas `app_preferences.disabled_skills`, and user-owned
+native skills; only remove links recorded as integration-owned. Do not copy
+the public catalog into Claude or change unrelated MCP/credential settings.
+Skill toggles refresh on a new session, as with the SDK's prompt snapshot.
+Validate with focused Python tests, the runtime metadata CLI tests, real task
+shells and both agent paths. PDF validation must exercise `pdftotext` and
+`pdftoppm`, not merely `which`.
