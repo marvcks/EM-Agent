@@ -127,7 +127,12 @@ describe("vite library build", () => {
       formats: ["es"],
     });
     expect(config.build?.rollupOptions?.external).toEqual(
-      expect.arrayContaining(["react", "react-dom", "react-router"]),
+      expect.arrayContaining([
+        "react",
+        "react-dom",
+        "react-dom/client",
+        "react-router",
+      ]),
     );
     expect(config.build?.rollupOptions?.output).toEqual(
       expect.arrayContaining([

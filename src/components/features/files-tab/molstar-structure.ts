@@ -54,5 +54,16 @@ export async function loadMolecularStructure(
       : { name: "model", params: {} },
   );
   if (!structure.obj?.data.elementCount) throw new Error("Empty structure");
-  return { model, structure, isCrystal: format === "cifCore" };
+  const component = await plugin.builders.structure.tryCreateComponentStatic(
+    structure,
+    "all",
+  );
+  if (!component) throw new Error("No structure component");
+  return {
+    trajectory,
+    model,
+    structure,
+    component,
+    isCrystal: format === "cifCore",
+  };
 }

@@ -64,19 +64,29 @@ export default function MolecularStructureViewer({
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2 text-xs">
         <span className="text-muted">{t(I18nKey.FILES$MOLECULAR_HELP)}</span>
-        <button
-          type="button"
-          disabled={status !== "ready"}
-          onClick={() => viewerRef.current?.reset()}
-          className="shrink-0 cursor-pointer rounded px-2 py-1 text-foreground hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {t(I18nKey.FILES$MOLECULAR_RESET)}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={status !== "ready"}
+            onClick={() => viewerRef.current?.expand()}
+            className="shrink-0 cursor-pointer rounded border border-border px-2 py-1 text-foreground hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t(I18nKey.FILES$MOLECULAR_EXPAND)}
+          </button>
+          <button
+            type="button"
+            disabled={status !== "ready"}
+            onClick={() => viewerRef.current?.reset()}
+            className="shrink-0 cursor-pointer rounded px-2 py-1 text-foreground hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t(I18nKey.FILES$MOLECULAR_RESET)}
+          </button>
+        </div>
       </div>
       <div className="relative min-h-0 flex-1 bg-surface">
         <div
           ref={containerRef}
-          role="img"
+          role="region"
           aria-label={t(I18nKey.FILES$MOLECULAR_CANVAS, { path })}
           className="absolute inset-0 overflow-hidden"
         />
@@ -105,7 +115,7 @@ export default function MolecularStructureViewer({
         )}
       </div>
       <p className="border-t border-border px-3 py-2 text-xs text-muted">
-        {t(I18nKey.FILES$MOLECULAR_FIRST_MODEL)}
+        {t(I18nKey.FILES$MOLECULAR_VIEWER_NOTE)}
       </p>
     </div>
   );

@@ -74,6 +74,7 @@ describe("FileContentViewer", () => {
       ready: Promise.resolve(),
       reset: vi.fn(),
       resize: vi.fn(),
+      expand: vi.fn(),
       dispose: vi.fn(),
     });
     useWorkspaceSessionMock.mockReset();

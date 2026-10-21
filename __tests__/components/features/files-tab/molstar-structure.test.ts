@@ -4,6 +4,10 @@ import { loadMolecularStructure } from "#/components/features/files-tab/molstar-
 
 import { createMolstarViewer } from "#/components/features/files-tab/molstar-viewer";
 
+// The video encoder installs Node process rejection handlers on import. It is
+// a browser/WASM platform service; parser and WebGL-error tests do not encode.
+vi.mock("h264-mp4-encoder", () => ({}));
+
 const WATER_XYZ = "3\nwater\nO 0 0 0\nH 0.76 0 0.59\nH -0.76 0 0.59\n";
 const WATER_MOL = `water
   EM-Agent
@@ -105,6 +109,11 @@ describe("workspace molecular structure parsing", () => {
       expect.arrayContaining([expect.closeTo(0.76), expect.closeTo(-0.76)]),
     );
     expect(result.isCrystal).toBe(false);
+    expect(result.component?.obj?.data.elementCount).toBe(3);
+    expect(
+      plugins.at(-1)!.managers.structure.hierarchy.current.structures[0]
+        .components,
+    ).toHaveLength(1);
   });
 
   it("recognizes crystal CIF, converts fractional coordinates, and expands symmetry", async () => {
@@ -114,13 +123,22 @@ describe("workspace molecular structure parsing", () => {
     expect(result.structure.obj!.data.elementCount).toBe(2);
   });
 
-  it("shows the first model of a multi-frame XYZ rather than combining frames", async () => {
+  it("retains a multi-frame XYZ trajectory and can switch the visible model", async () => {
     const result = await parse(
       "trajectory.xyz",
       WATER_XYZ + WATER_XYZ.replaceAll("0.76", "1.76"),
     );
     expect(result.structure.obj!.data.elementCount).toBe(3);
     expect(result.model.obj!.data.atomicConformation.x[1]).toBeCloseTo(0.76);
+    expect(result.trajectory.obj!.data.frameCount).toBe(2);
+    await plugins
+      .at(-1)!
+      .state.data.build()
+      .to(result.model)
+      .update({ modelIndex: 1 })
+      .commit();
+    expect(result.model.obj!.data.atomicConformation.x[1]).toBeCloseTo(1.76);
+    expect(result.component!.obj!.data.elementCount).toBe(3);
   });
 
   it.each([

@@ -12,6 +12,7 @@ const createViewer = vi.mocked(createMolstarViewer);
 const reset = vi.fn();
 const dispose = vi.fn();
 const resize = vi.fn();
+const expand = vi.fn();
 
 // @spec MOL-002 — Own the WebGL viewer lifecycle and show actionable errors
 describe("MolecularStructureViewer", () => {
@@ -21,6 +22,7 @@ describe("MolecularStructureViewer", () => {
       ready: Promise.resolve(),
       reset,
       resize,
+      expand,
       dispose,
     });
   });
@@ -33,6 +35,13 @@ describe("MolecularStructureViewer", () => {
       await screen.findByRole("button", { name: "FILES$MOLECULAR_RESET" }),
     );
     expect(reset).toHaveBeenCalledOnce();
+    await userEvent.click(
+      screen.getByRole("button", { name: "FILES$MOLECULAR_EXPAND" }),
+    );
+    expect(expand).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole("region", { name: "FILES$MOLECULAR_CANVAS" }),
+    ).toBeInTheDocument();
     rerender(<MolecularStructureViewer path="crystal.cif" text="crystal" />);
     await waitFor(() =>
       expect(createViewer).toHaveBeenLastCalledWith(
@@ -61,6 +70,7 @@ describe("MolecularStructureViewer", () => {
       ready: Promise.reject(new Error("no WebGL")),
       reset,
       resize,
+      expand,
       dispose,
     });
     render(<MolecularStructureViewer path="water.xyz" text="water" />);
@@ -85,6 +95,7 @@ describe("MolecularStructureViewer", () => {
       }),
       reset,
       resize,
+      expand,
       dispose,
     });
     const { rerender } = render(

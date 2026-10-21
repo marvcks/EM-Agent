@@ -19,6 +19,7 @@ const LIB_ENTRY = fileURLToPath(new URL("./src/index.ts", import.meta.url));
 const LIB_EXTERNALS = [
   "react",
   "react-dom",
+  "react-dom/client",
   "react/jsx-runtime",
   "react/jsx-dev-runtime",
   "react-router",
