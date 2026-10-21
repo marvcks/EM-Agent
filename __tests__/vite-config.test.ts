@@ -86,6 +86,23 @@ describe("vite path resolution", () => {
 });
 
 describe("vite app build", () => {
+  it("keeps the shared Markdown renderer outside the lazy molecular viewer", async () => {
+    const config = await viteConfig({ mode: "production", command: "build" });
+    const groups = config.build?.rolldownOptions?.output;
+    const output = Array.isArray(groups) ? groups[0] : groups;
+    const splitting = output?.codeSplitting;
+    const markdownGroup =
+      typeof splitting === "object"
+        ? splitting.groups?.find((group) => group.name === "vendor-markdown")
+        : undefined;
+    expect(markdownGroup?.test).toBeInstanceOf(RegExp);
+    expect(
+      (markdownGroup!.test as RegExp).test(
+        "/node_modules/react-markdown/lib/index.js",
+      ),
+    ).toBe(true);
+  });
+
   it("configures Rolldown code splitting for large vendor chunks", async () => {
     const config = await viteConfig({ mode: "production", command: "build" });
     const appBuild = config as {
@@ -104,7 +121,9 @@ describe("vite app build", () => {
       };
     };
 
-    expect(appBuild.build?.rolldownOptions?.output?.codeSplitting?.groups).toEqual(
+    expect(
+      appBuild.build?.rolldownOptions?.output?.codeSplitting?.groups,
+    ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           name: "vendor",

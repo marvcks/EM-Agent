@@ -200,6 +200,9 @@ When adding code that needs a new string, decide up front which rule it falls un
   measurements and frame controls operate on the displayed structure.
   The app's `vendor-molstar` group must retain Mol*'s cyclic internal graph;
   generic size splitting causes an undefined `Schema` error in production.
+  Capture the shared `react-markdown` renderer in the earlier `vendor-markdown`
+  group so chat rendering cannot pull the full molecular viewer into its
+  initial static dependency graph.
   Scope the upstream CSS to the Canvas shell and verify the built app.
   Establish the canvas before registering UI extensions so unsupported WebGL
   fails before their initialization callbacks. Detach the owned viewport on
