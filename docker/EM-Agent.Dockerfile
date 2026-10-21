@@ -26,7 +26,8 @@ LABEL io.em-agent.analysis="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${SOURCE_COMMIT}
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils \
+RUN mkdir -p /opt/em-agent \
+ && apt-get update && apt-get install -y --no-install-recommends poppler-utils \
  && dpkg-query -W poppler-utils > /opt/em-agent/pdf-runtime.txt \
  && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /opt/agent-canvas/frontend
