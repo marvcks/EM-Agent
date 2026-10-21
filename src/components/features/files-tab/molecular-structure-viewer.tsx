@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { I18nKey } from "#/i18n/declaration";
-import {
-  createMolstarViewer,
-  type MolecularViewerController,
-} from "./molstar-viewer";
+import { createMolstarViewer } from "./molstar-viewer";
 
 interface MolecularStructureViewerProps {
   path: string;
@@ -18,7 +15,6 @@ export default function MolecularStructureViewer({
 }: MolecularStructureViewerProps) {
   const { t } = useTranslation("openhands");
   const containerRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<MolecularViewerController | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
@@ -28,12 +24,11 @@ export default function MolecularStructureViewer({
     const container = containerRef.current;
     if (!container) return;
     let cancelled = false;
-    let viewer: MolecularViewerController | undefined;
+    let viewer: ReturnType<typeof createMolstarViewer> | undefined;
     let observer: ResizeObserver | undefined;
     setStatus("loading");
     try {
       viewer = createMolstarViewer(container, path, text);
-      viewerRef.current = viewer;
       if (typeof ResizeObserver !== "undefined") {
         observer = new ResizeObserver(() => viewer?.resize());
         observer.observe(container);
@@ -53,7 +48,6 @@ export default function MolecularStructureViewer({
       cancelled = true;
       observer?.disconnect();
       viewer?.dispose();
-      viewerRef.current = null;
     };
   }, [path, text, attempt]);
 
@@ -62,27 +56,6 @@ export default function MolecularStructureViewer({
       className="flex h-full min-h-0 w-full flex-1 flex-col"
       data-testid="file-content-viewer-molecular"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2 text-xs">
-        <span className="text-muted">{t(I18nKey.FILES$MOLECULAR_HELP)}</span>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={status !== "ready"}
-            onClick={() => viewerRef.current?.expand()}
-            className="shrink-0 cursor-pointer rounded border border-border px-2 py-1 text-foreground hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t(I18nKey.FILES$MOLECULAR_EXPAND)}
-          </button>
-          <button
-            type="button"
-            disabled={status !== "ready"}
-            onClick={() => viewerRef.current?.reset()}
-            className="shrink-0 cursor-pointer rounded px-2 py-1 text-foreground hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t(I18nKey.FILES$MOLECULAR_RESET)}
-          </button>
-        </div>
-      </div>
       <div className="relative min-h-0 flex-1 bg-surface">
         <div
           ref={containerRef}
@@ -114,9 +87,6 @@ export default function MolecularStructureViewer({
           </div>
         )}
       </div>
-      <p className="border-t border-border px-3 py-2 text-xs text-muted">
-        {t(I18nKey.FILES$MOLECULAR_VIEWER_NOTE)}
-      </p>
     </div>
   );
 }

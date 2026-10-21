@@ -72,9 +72,7 @@ describe("FileContentViewer", () => {
     createMolstarViewerMock.mockReset();
     createMolstarViewerMock.mockReturnValue({
       ready: Promise.resolve(),
-      reset: vi.fn(),
       resize: vi.fn(),
-      expand: vi.fn(),
       dispose: vi.fn(),
     });
     useWorkspaceSessionMock.mockReset();

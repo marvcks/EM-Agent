@@ -212,6 +212,7 @@ When adding code that needs a new string, decide up front which rule it falls un
   Expanded views reparent the same root to a body-level CSS-scoped host to escape
   transformed Canvas panels; return it on collapse/Escape and remove the host on
   disposal. Keep `react-dom/client` external in the library build.
-  Use the portrait layout in narrow panes, and keep the Expand viewer action
-  available to open both tool panels in the full-page layout. Mol*'s native UI
-  keeps upstream labels; wrapper labels and errors use application i18n.
+  Use the portrait layout in narrow panes. Camera reset and expansion belong to
+  Mol*'s native controls; do not add an EM-Agent toolbar or footer note around
+  the Viewer. Mol*'s native UI keeps upstream labels; loading and error states
+  use application i18n.

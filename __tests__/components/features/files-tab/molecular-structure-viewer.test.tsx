@@ -9,10 +9,8 @@ vi.mock("#/components/features/files-tab/molstar-viewer", () => ({
 }));
 
 const createViewer = vi.mocked(createMolstarViewer);
-const reset = vi.fn();
 const dispose = vi.fn();
 const resize = vi.fn();
-const expand = vi.fn();
 
 // @spec MOL-002 — Own the WebGL viewer lifecycle and show actionable errors
 describe("MolecularStructureViewer", () => {
@@ -20,25 +18,16 @@ describe("MolecularStructureViewer", () => {
     vi.clearAllMocks();
     createViewer.mockReturnValue({
       ready: Promise.resolve(),
-      reset,
       resize,
-      expand,
       dispose,
     });
   });
 
-  it("loads new contents, resets the camera, and releases each viewer", async () => {
+  it("loads new contents and releases each viewer", async () => {
     const { rerender, unmount } = render(
       <MolecularStructureViewer path="water.xyz" text="water" />,
     );
-    await userEvent.click(
-      await screen.findByRole("button", { name: "FILES$MOLECULAR_RESET" }),
-    );
-    expect(reset).toHaveBeenCalledOnce();
-    await userEvent.click(
-      screen.getByRole("button", { name: "FILES$MOLECULAR_EXPAND" }),
-    );
-    expect(expand).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
     expect(
       screen.getByRole("region", { name: "FILES$MOLECULAR_CANVAS" }),
     ).toBeInTheDocument();
@@ -68,9 +57,7 @@ describe("MolecularStructureViewer", () => {
   it("shows a readable failure and can retry initialization", async () => {
     createViewer.mockReturnValueOnce({
       ready: Promise.reject(new Error("no WebGL")),
-      reset,
       resize,
-      expand,
       dispose,
     });
     render(<MolecularStructureViewer path="water.xyz" text="water" />);
@@ -93,9 +80,7 @@ describe("MolecularStructureViewer", () => {
       ready: new Promise<void>((_, fail) => {
         reject = fail;
       }),
-      reset,
       resize,
-      expand,
       dispose,
     });
     const { rerender } = render(
@@ -106,8 +91,6 @@ describe("MolecularStructureViewer", () => {
       reject(new Error("old file failed"));
     });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "FILES$MOLECULAR_RESET" }),
-    ).toBeEnabled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

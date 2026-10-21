@@ -11,8 +11,6 @@ import "molstar/build/viewer/molstar.css";
 
 export interface MolecularViewerController {
   ready: Promise<void>;
-  reset: () => void;
-  expand: () => void;
   resize: () => void;
   dispose: () => void;
 }
@@ -156,24 +154,6 @@ export function createMolstarViewer(
   );
   return {
     ready,
-    reset: () => {
-      if (!disposed) plugin.managers.camera.reset();
-    },
-    expand: () => {
-      if (disposed) return;
-      void PluginCommands.Layout.Update(plugin, {
-        state: {
-          isExpanded: true,
-          showControls: true,
-          regionState: {
-            left: "full",
-            right: "full",
-            top: "full",
-            bottom: "full",
-          },
-        },
-      });
-    },
     resize: () => {
       if (disposed) return;
       updateEmbeddedLayout();

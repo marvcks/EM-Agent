@@ -10,7 +10,7 @@
 
 ### MOL-002: Viewer ownership and interaction
 
-- Start with a ball-and-stick representation colored by chemical element, with drag rotation, scroll zoom, right-drag pan, and Reset view.
+- Start with a ball-and-stick representation colored by chemical element, with native drag rotation, scroll zoom, right-drag pan and camera controls.
 - Show localized loading and failure states. Initialization/parse failure offers Retry and suggests inspecting Plain text or checking WebGL.
 - Recreate the viewer when the path or file contents change. Resize the canvas with the panel, and dispose owned resources on switching modes/files or unmount.
 - Ignore stale async completion/failure after the previous file is abandoned. Detach its owned viewport immediately and dispose after in-flight tasks settle; retain each canvas's parent through Mol* input cleanup.
@@ -29,5 +29,6 @@
 - Use the official Viewer spec, default behaviors, animations and extensions, including the structure tools, selection, measurements, representations/colors, sequence view, trajectory controls, snapshots, screenshots, and model/animation/geometry exports.
 - Keep controls interactive and accessible inside a named region, rather than exposing the whole interactive viewer as an image.
 - Scope the upstream Mol* stylesheet inside the Canvas shell and preserve lazy loading. Keep the cyclic Mol* modules in the existing `vendor-molstar` chunk.
-- Use the portrait layout in narrow embedded panes and the landscape layout in sufficiently wide panes. Expand viewer opens the full-page layout with both tool panels; returning restores a usable embedded layout.
+- Use the portrait layout in narrow embedded panes and the landscape layout in sufficiently wide panes. Native expansion opens the full-page layout; returning restores a usable embedded layout.
+- Let the native Viewer occupy the preview area without an additional EM-Agent toolbar or footer note; reset and expansion use the native controls.
 - Native Mol* controls retain their upstream labels; EM-Agent wrapper labels and errors use the application's locale.
