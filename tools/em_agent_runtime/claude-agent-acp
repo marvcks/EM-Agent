@@ -1,5 +1,16 @@
 #!/bin/sh
 set -eu
+# PyInstaller's Agent Server needs its bundled libraries; external programs
+# need the original loader path (not the server's older bundled libstdc++).
+case "${LD_LIBRARY_PATH:-}" in
+  */_MEI*)
+    if [ -n "${LD_LIBRARY_PATH_ORIG:-}" ]; then
+      export LD_LIBRARY_PATH="$LD_LIBRARY_PATH_ORIG"
+    else
+      unset LD_LIBRARY_PATH
+    fi
+    ;;
+esac
 /usr/local/bin/python /opt/agent-canvas/em_agent_runtime/runtime.py sync-claude-skills
 # ACP client terminals can execute through sh instead of bash. Scope the
 # analysis environment to this CLI and its children; the server stays separate.

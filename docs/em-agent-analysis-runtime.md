@@ -7,6 +7,9 @@
 激活的虚拟环境优先。Agent Server、automation 和科学服务仍使用镜像原有 Python。
 Claude ACP 启动器只给自己的 CLI 子进程设置分析环境，因此通过 `sh` 执行的
 ACP 终端同样使用新解释器，不依赖 Bash 的启动文件。
+启动器还按 [PyInstaller 的外部程序环境约定](https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html)
+恢复继承的动态库搜索路径，防止 PDF 等系统工具加载 Agent Server 打包的旧 C++ 库。
+此清理只作用于 CLI 子进程；用户显式设置且不含 PyInstaller 路径的库路径保留。
 
 `em-env --json` 返回实际解释器、已安装包版本和科学 CLI 路径；同一份环境说明通过
 现有 runtime-services 元数据进入新对话，包含使用入口和可写性说明。

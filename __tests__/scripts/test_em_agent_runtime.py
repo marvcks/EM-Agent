@@ -117,7 +117,7 @@ class RuntimeTests(unittest.TestCase):
             python.write_text('#!/bin/sh\necho analysis\n')
             python.chmod(0o755)
             upstream = root / 'upstream'
-            upstream.write_text('#!/bin/sh\npython; printf "%s" "$1"\n')
+            upstream.write_text('#!/bin/sh\npython; printf "%s|%s" "$1" "${LD_LIBRARY_PATH-unset}"\n')
             upstream.chmod(0o755)
             launcher = root / 'launcher'
             source = (ROOT / 'tools/em_agent_runtime/claude-agent-acp').read_text()
@@ -127,9 +127,19 @@ class RuntimeTests(unittest.TestCase):
             launcher.write_text(source)
             env = {**os.environ, 'EM_AGENT_ANALYSIS_ENV': str(analysis)}
             env.pop('VIRTUAL_ENV', None)
-            result = subprocess.run(['/bin/sh', str(launcher), 'forwarded-argument'], env=env,
-                                    capture_output=True, text=True, check=True)
-            self.assertEqual(result.stdout, 'analysis\nforwarded-argument')
+            for loader, original, expected in [
+                ('/tmp/_MEI-test', None, 'unset'),
+                ('/tmp/_MEI-test:/opt/vendor/lib', '/opt/vendor/lib', '/opt/vendor/lib'),
+                ('/opt/custom/lib', None, '/opt/custom/lib'),
+            ]:
+                with self.subTest(loader=loader, original=original):
+                    child_env = {**env, 'LD_LIBRARY_PATH': loader}
+                    child_env.pop('LD_LIBRARY_PATH_ORIG', None)
+                    if original is not None:
+                        child_env['LD_LIBRARY_PATH_ORIG'] = original
+                    result = subprocess.run(['/bin/sh', str(launcher), 'forwarded-argument'], env=child_env,
+                                            capture_output=True, text=True, check=True)
+                    self.assertEqual(result.stdout, f'analysis\nforwarded-argument|{expected}')
 
 
 if __name__ == '__main__':

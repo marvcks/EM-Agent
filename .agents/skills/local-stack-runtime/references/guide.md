@@ -165,6 +165,10 @@ Skill toggles refresh on a new session, as with the SDK's prompt snapshot.
 The launcher also sources the task environment before `exec`: ACP terminal
 clients can use `sh`, which ignores `BASH_ENV`. Keep this environment scoped
 to the CLI child process rather than changing the server's PATH.
+Restore `LD_LIBRARY_PATH_ORIG` (or unset `LD_LIBRARY_PATH` if no original exists)
+when the child inherited a PyInstaller `/_MEI` path. Otherwise system programs
+such as Poppler can load the server's older bundled libstdc++ and fail despite
+passing a standalone-container smoke test. Keep custom non-PyInstaller paths.
 Validate with focused Python tests, the runtime metadata CLI tests, real task
 shells and both agent paths. PDF validation must exercise `pdftotext` and
 `pdftoppm`, not merely `which`.

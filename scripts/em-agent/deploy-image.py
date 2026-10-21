@@ -196,6 +196,7 @@ def deploy(root, image, commit):
                     ('.venv/bin/python', 'psi4/bin/python', 'manifest.json', 'models/model.tar.gz', 'models/preprocessor.json', 'models/model/saved_model.pb')]
         if not all(path.is_file() and path.stat().st_size > 0 for path in required):
             raise RuntimeError('Prepare isolated ALFABET/Psi4 runtimes and verified BDE model assets before deploying')
+    # @spec AR-004 — Candidate image and persistent runtime share the exact lock.
     analysis_tools = labels.get('io.em-agent.analysis') == '1'
     if analysis_tools:
         runtime = Path('/opt/em-agent-tools/analysis')
