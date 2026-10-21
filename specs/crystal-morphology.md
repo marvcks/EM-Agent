@@ -16,6 +16,7 @@
 - **CM-004 — Reviewable output.** Per-row classes with the three uncalibrated
   probabilities, class counts and an `in_training_range` flag; downloadable
   CSV/JSON/ZIP. Rows outside the training envelope are flagged as extrapolation.
+  The result table identifies each row as within range or extrapolation.
   Only a fully verified result is published as success.
 - **CM-005 — Deployment isolation.** The runtime lives at
   `/opt/em-agent-tools/crystal-morphology` (uv + frozen Python 3.11 lock),

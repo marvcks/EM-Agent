@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "../../../../test-utils";
 import { ScienceAppsPage } from "#/components/features/science-apps/science-apps-page";
@@ -439,6 +439,59 @@ describe("manual scientific applications", () => {
         expect.anything(),
       ),
     );
+  });
+
+  // @spec CM-004 — Identify the specific extrapolated row in a mixed batch
+  it("marks training-range status on each prediction row", async () => {
+    const features = {
+      添加剂百分比: 1,
+      "反溶剂温度(°C)": 10,
+      "搅拌速率(rpm)": 300,
+      "浓度(g/ml)": 0.06,
+      "溶剂/反溶剂比值": 0.125,
+    };
+    const prediction = {
+      features,
+      predicted_label: "球",
+      probabilities: { 其他: 0.2, 球: 0.7, 针: 0.1 },
+    };
+    vi.mocked(scienceAppsService.job).mockResolvedValue({
+      ...job,
+      app_id: "crystal-morphology",
+      status: "succeeded",
+      result: {
+        model_id: "CatBoost",
+        outside_training_range_count: 1,
+        rows: [
+          { ...prediction, index: 1, in_training_range: true },
+          {
+            ...prediction,
+            index: 2,
+            features: { ...features, "浓度(g/ml)": 0.5 },
+            in_training_range: false,
+          },
+        ],
+      },
+    });
+    renderWithProviders(
+      <ScienceAppsPage
+        appId="crystal-morphology"
+        jobId="abc"
+        onSelectJob={vi.fn()}
+      />,
+    );
+    const table = await screen.findByRole("table");
+    const rows = within(table).getAllByRole("row");
+    expect(
+      within(rows[1]).getByRole("cell", {
+        name: "SCIENCE$MORPHOLOGY_IN_RANGE",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(rows[2]).getByRole("cell", {
+        name: "SCIENCE$MORPHOLOGY_EXTRAPOLATION",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("filters deployed applications and links to the standalone workbench", async () => {

@@ -37,6 +37,8 @@ class MorphologyContractTests(unittest.TestCase):
         header = '添加剂百分比,反溶剂温度(°C),搅拌速率(rpm),浓度(g/ml),溶剂/反溶剂比值'
         rows = parse_batch_rows(header + '\n1,10,300,0.06,0.125\n5,5,300,0.06,0.167\n')
         self.assertEqual(rows, [[1.0, 10.0, 300.0, 0.06, 0.125], [5.0, 5.0, 300.0, 0.06, 0.167]])
+        with self.assertRaises(ValueError):
+            parse_batch_rows(header + ',真实形貌\n1,10,300,0.06,0.125,球\n')
         too_many = header + '\n' + '\n'.join('1,10,300,0.06,0.125' for _ in range(MAX_BATCH_ROWS + 1))
         for bad in ['', header, header + '\n1,10,300,0.06', header + '\n1,10,300,0.06,0.125,9',
                     header + '\n1,10,300,nan,0.125', header + '\n1,10,300,inf,0.125',

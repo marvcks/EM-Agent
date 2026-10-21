@@ -344,6 +344,7 @@ export function MorphologyResult({
                 <th key={feature}>{feature}</th>
               ))}
               <th>{t(I18nKey.SCIENCE$MORPHOLOGY_PREDICTION)}</th>
+              <th>{t(I18nKey.SCIENCE$MORPHOLOGY_RANGE)}</th>
               {Object.keys(result.rows[0].probabilities).map((label) => (
                 <th key={label}>{`P(${label})`}</th>
               ))}
@@ -362,6 +363,13 @@ export function MorphologyResult({
                   <td key={feature}>{row.features[feature]}</td>
                 ))}
                 <td>{row.predicted_label}</td>
+                <td>
+                  {t(
+                    row.in_training_range
+                      ? I18nKey.SCIENCE$MORPHOLOGY_IN_RANGE
+                      : I18nKey.SCIENCE$MORPHOLOGY_EXTRAPOLATION,
+                  )}
+                </td>
                 {Object.values(row.probabilities).map((value, index) => (
                   <td key={index}>{value.toFixed(3)}</td>
                 ))}

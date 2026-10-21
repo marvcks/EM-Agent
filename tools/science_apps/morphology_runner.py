@@ -46,7 +46,8 @@ def parse_batch_rows(text):
         header = [cell.strip() for cell in next(reader)]
     except StopIteration:
         raise ValueError('invalid_morphology_input') from None
-    if any(header.count(name) != 1 for name, _, _, _ in FEATURE_FIELDS):
+    if (len(header) != len(FEATURE_FIELDS)
+            or any(header.count(name) != 1 for name, _, _, _ in FEATURE_FIELDS)):
         raise ValueError('invalid_morphology_input')
     columns = [header.index(name) for name, _, _, _ in FEATURE_FIELDS]
     rows = []
