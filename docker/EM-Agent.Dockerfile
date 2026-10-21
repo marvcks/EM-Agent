@@ -13,7 +13,21 @@ ENV VITE_BASE_PATH=/canvas
 RUN npm run make-i18n && npm run check-translation-completeness && npm run typecheck && npm run build
 RUN node -e 'const fs = require("node:fs"); fs.writeFileSync("/build/release.json", JSON.stringify({source:"https://github.com/marvcks/EM-Agent",revision:process.env.SOURCE_COMMIT,canvasVersion:require("./package.json").version,nodeVersion:process.version}) + "\n")'
 
-FROM ${RUNTIME_IMAGE} AS final
+# PDF dependencies are independent of application revisions and remain cached.
+FROM ${RUNTIME_IMAGE} AS pdf-runtime
+USER root
+ARG POPPLER_VERSION=25.03.0-5+deb13u4
+RUN mkdir -p /opt/em-agent \
+ && sed -e 's|http://snapshot.debian.org/archive/debian/[0-9TZ]*/|https://mirrors.tuna.tsinghua.edu.cn/debian/|' \
+        -e 's|http://snapshot.debian.org/archive/debian-security/[0-9TZ]*/|https://mirrors.tuna.tsinghua.edu.cn/debian-security/|' \
+        /etc/apt/sources.list.d/debian.sources > /tmp/em-agent-pdf.sources \
+ && apt-get -o Dir::Etc::sourcelist=/tmp/em-agent-pdf.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=2 -o Acquire::https::Timeout=30 update \
+ && apt-get -o Dir::Etc::sourcelist=/tmp/em-agent-pdf.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=2 -o Acquire::https::Timeout=30 install -y --no-install-recommends --no-upgrade "poppler-utils=${POPPLER_VERSION}" \
+ && dpkg-query -W poppler-utils > /opt/em-agent/pdf-runtime.txt \
+ && dpkg-query -W > /opt/em-agent/pdf-runtime-packages.tsv \
+ && rm -rf /var/lib/apt/lists/* /tmp/em-agent-pdf.sources
+
+FROM pdf-runtime AS final
 ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.title="EM-Agent"
 LABEL org.opencontainers.image.source="https://github.com/marvcks/EM-Agent"
@@ -26,10 +40,6 @@ LABEL io.em-agent.analysis="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${SOURCE_COMMIT}
 USER root
-RUN mkdir -p /opt/em-agent \
- && apt-get update && apt-get install -y --no-install-recommends poppler-utils \
- && dpkg-query -W poppler-utils > /opt/em-agent/pdf-runtime.txt \
- && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /opt/agent-canvas/frontend
 COPY --from=frontend-build /build/build /opt/agent-canvas/frontend
 COPY --from=frontend-build /build/release.json /opt/em-agent/release.json

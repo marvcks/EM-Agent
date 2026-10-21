@@ -31,7 +31,9 @@ python3 scripts/em-agent/deploy-image.py deploy --image em-agent:FULL_COMMIT --c
 `manifest.json`。已存在 manifest 时拒绝静默覆盖，应先检查现有安装及升级方案。
 镜像带 `io.em-agent.analysis=1`，部署器检查安装及锁文件散列，再添加只读挂载。
 安装器、环境和依赖缓存不进入 Git。镜像中的 Poppler 包版本记录在
-`/opt/em-agent/pdf-runtime.txt`。
+`/opt/em-agent/pdf-runtime.txt`，完整系统包清单在相邻
+`pdf-runtime-packages.tsv`。PDF 依赖放在独立的镜像缓存层；固定 Poppler 版本，通过
+清华 Debian 镜像和 Debian 原有签名密钥验证安装。临时安装源不会替换镜像原有软件源。
 
 分析环境与共享解释器在宿主机持久保存，重建容器后继续挂载。Claude 状态新增保存到
 宿主机 `/opt/openhands/claude-state`，挂载为 `/home/openhands/.claude`；首次部署
