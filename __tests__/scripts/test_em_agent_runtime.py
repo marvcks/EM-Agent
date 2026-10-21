@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -101,6 +102,34 @@ class RuntimeTests(unittest.TestCase):
             env.update(VIRTUAL_ENV=str(project), PATH=f'{project}/bin:{os.environ["PATH"]}')
             result = subprocess.run(['/bin/bash', '-c', f'. "{script}"; python'], env=env, capture_output=True, text=True, check=True)
             self.assertEqual(result.stdout.strip(), 'project')
+
+    # @spec AR-001 — ACP terminals may use sh and ignore BASH_ENV
+    def test_acp_launcher_passes_analysis_to_non_bash_children(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / 'runtime'
+            runtime.mkdir()
+            (runtime / 'runtime.py').write_text('pass\n')
+            (runtime / 'task-shell.sh').write_text((ROOT / 'tools/em_agent_runtime/task-shell.sh').read_text())
+            analysis = root / 'analysis'
+            (analysis / 'bin').mkdir(parents=True)
+            python = analysis / 'bin/python'
+            python.write_text('#!/bin/sh\necho analysis\n')
+            python.chmod(0o755)
+            upstream = root / 'upstream'
+            upstream.write_text('#!/bin/sh\npython; printf "%s" "$1"\n')
+            upstream.chmod(0o755)
+            launcher = root / 'launcher'
+            source = (ROOT / 'tools/em_agent_runtime/claude-agent-acp').read_text()
+            source = source.replace('/opt/agent-canvas/em_agent_runtime', str(runtime))
+            source = source.replace('/usr/local/bin/python', sys.executable)
+            source = source.replace('/usr/local/bin/claude-agent-acp.upstream', str(upstream))
+            launcher.write_text(source)
+            env = {**os.environ, 'EM_AGENT_ANALYSIS_ENV': str(analysis)}
+            env.pop('VIRTUAL_ENV', None)
+            result = subprocess.run(['/bin/sh', str(launcher), 'forwarded-argument'], env=env,
+                                    capture_output=True, text=True, check=True)
+            self.assertEqual(result.stdout, 'analysis\nforwarded-argument')
 
 
 if __name__ == '__main__':

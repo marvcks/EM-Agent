@@ -1,4 +1,7 @@
 #!/bin/sh
 set -eu
 /usr/local/bin/python /opt/agent-canvas/em_agent_runtime/runtime.py sync-claude-skills
+# ACP client terminals can execute through sh instead of bash. Scope the
+# analysis environment to this CLI and its children; the server stays separate.
+. /opt/agent-canvas/em_agent_runtime/task-shell.sh
 exec /usr/local/bin/claude-agent-acp.upstream "$@"

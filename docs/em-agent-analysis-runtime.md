@@ -5,6 +5,8 @@
 新对话的 bash 终端默认使用
 `/opt/em-agent-tools/analysis/.venv/bin/python`（Python 3.11.15）。已有项目显式
 激活的虚拟环境优先。Agent Server、automation 和科学服务仍使用镜像原有 Python。
+Claude ACP 启动器只给自己的 CLI 子进程设置分析环境，因此通过 `sh` 执行的
+ACP 终端同样使用新解释器，不依赖 Bash 的启动文件。
 
 `em-env --json` 返回实际解释器、已安装包版本和科学 CLI 路径；同一份环境说明通过
 现有 runtime-services 元数据进入新对话，包含使用入口和可写性说明。
