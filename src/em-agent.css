@@ -15,9 +15,6 @@ aside[data-collapsed="false"] nav > a { min-height: 43px; border-radius: 8px; fo
 aside[data-collapsed="false"] [data-testid="sidebar-conversations-link"] { background: var(--oh-surface); color: var(--oh-color-primary); border: 1px solid var(--oh-border-input); box-shadow: 0 2px 4px #263c5710; font-weight: 600; margin-bottom: 6px; }
 .em-nav-heading { padding: 20px 10px 8px; font-size: 10px; letter-spacing: .12em; color: var(--oh-text-dim); }
 .em-workspace-main { gap: 0; }
-.em-topbar { height: 58px; min-height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 38px; border-bottom: 1px solid var(--oh-border-subtle); font-size: 11px; color: var(--oh-text-dim); }
-.em-topbar > div > span { margin: 0 12px; opacity: .5; }
-.em-space-label { font-size: 10px; }
 [data-testid="sidebar-onboarding-checklist"] ul { max-height: 128px; overflow-y: auto; }
 [data-testid="conversation-panel"] { margin-top: 22px; border-top: 1px solid var(--oh-border); padding-top: 10px; }
 [data-testid="older-conversations-summary"] { font-size: 12px; }
@@ -39,7 +36,6 @@ aside[data-collapsed="false"] [data-testid="sidebar-conversations-link"] { backg
   aside[data-collapsed="true"] { width: 80px; min-width: 80px; }
 }
 @media (max-width: 767px) {
-  .em-topbar { display: none; }
   .em-welcome { padding: 0 0 16px; }
   .em-welcome h1 { font-size: 28px; }
   [data-testid="home-header-subtitle"] { font-size: 11px; max-width: 270px; margin-top: 10px; }
