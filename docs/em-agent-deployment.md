@@ -183,6 +183,24 @@ Psi4 环境、manifest、官方预处理文件和模型文件，并添加 BDE �
 不联网下载权重。版本、源提交、模型散列及 Python/Conda 锁文件保存在工具目录，安装与
 部署证据见本地 BDE 报告。不要在线改容器源码或升级 Agent Server 的包来修复科学依赖。
 
+### 晶体形貌判别运行时
+
+带 `io.em-agent.crystal-morphology=1` 的镜像独立检查
+`/opt/em-agent-tools/crystal-morphology` 的 venv、manifest 与模型缓存，再添加
+crystal-morphology 与共享 Python 的只读挂载。运行时用仓库内
+`tools/science_apps/runtime/crystal-morphology/{pyproject.toml,uv.lock}`
+（numpy 1.26.4 / scikit-learn 1.5.2 / xgboost 2.1.2 / lightgbm 4.6.0 / catboost 1.2.8 /
+threadpoolctl，Python 3.11）在 `/opt/em-agent-tools/crystal-morphology` 重建：
+
+```sh
+uv sync --frozen --project /opt/em-agent-tools/crystal-morphology \
+  --python /opt/em-agent-tools/python/cpython-3.11-linux-x86_64-gnu/bin/python3
+```
+
+模型缓存安装时复制并记录 SHA-256（`manifest.json`），推理期间不联网、不重训。
+启动时仅在无同名用户技能时链接 `crystal-morphology`。具体验收见本地
+`CRYSTAL-MORPHOLOGY-EM-Agent-deployment-report.txt`。
+
 ### MinerU 云端适配
 
 镜像包含标准库适配器 `mineru-parse`、共用队列 CLI `em-mineru` 和 `mineru` 使用技能。

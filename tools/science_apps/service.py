@@ -28,6 +28,7 @@ from .reaction_runner import REACTION_APPS, runtime_available, validate_request,
 
 from .bde_runner import bde_available, validate_bde, verified_bde
 from .mineru_runner import MAX_DOCUMENT_BYTES, mineru_available, validate_document, verified_mineru
+from .morphology_runner import morphology_available, validate_morphology, verified_morphology
 
 PREFIX = '/api/science'
 MAX_LOG_BYTES = 10 * 1024 * 1024
@@ -43,6 +44,9 @@ APPLICATIONS = {
     'magus': {'name': 'MAGUS', 'executable': 'magus-mace', 'methods': ['MACE-OFF23'], 'bases': [], 'category': 'crystal'},
     'aizynthfinder': {'name': 'AiZynthFinder', 'executable': 'aizynth-route', 'methods': ['USPTO'], 'bases': [], 'category': 'reaction'},
     'lcms2yield': {'name': 'lcms2yield', 'executable': 'lcms-cf', 'methods': ['UV-CF 20250721'], 'bases': [], 'category': 'reaction'},
+    'crystal-morphology': {'name': '晶体形貌判别', 'executable': 'morphology-classify',
+                           'methods': ['auto', 'CatBoost', 'LightGBM', 'XGBoost', 'SVM', 'GradientBoosting', 'RandomForest'],
+                           'bases': [], 'category': 'crystal'},
 }
 
 
@@ -51,6 +55,8 @@ def application_executable(app_id):
     if app_id == 'mineru' and not mineru_available():
         return None
     if app_id == 'bde' and not bde_available():
+        return None
+    if app_id == 'crystal-morphology' and not morphology_available():
         return None
     if app_id in REACTION_APPS and not runtime_available(app_id):
         return None
@@ -62,7 +68,7 @@ def application_executable(app_id):
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru']
+    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology']
     document_name: str = Field(default='', max_length=128)
     language: Literal['en', 'ch'] = 'ch'
     enable_formula: bool = True
@@ -72,13 +78,20 @@ class JobRequest(BaseModel):
     input_kind: Literal['smiles', 'name'] = 'smiles'
     compound_name: str = Field(default='', max_length=256)
     title: str = Field(default='', max_length=80)
-    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde', 'textify'] = 'energy'
+    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde', 'textify', 'classification'] = 'energy'
     method: str = ''
     basis: str = ''
     charge: int = Field(default=0, ge=-10, le=10)
     multiplicity: int = Field(default=1, ge=1, le=5)
     cores: int = Field(default=2, ge=1, le=8)
     memory_mb: int = Field(default=2048, ge=512, le=8192)
+    input_mode: Literal['single', 'batch'] = 'single'
+    table_csv: str = Field(default='', max_length=32768)
+    additive_percent: float | None = Field(default=None, allow_inf_nan=False)
+    antisolvent_temp_c: float | None = Field(default=None, allow_inf_nan=False)
+    stirring_rpm: float | None = Field(default=None, allow_inf_nan=False)
+    concentration_g_ml: float | None = Field(default=None, allow_inf_nan=False)
+    solvent_ratio: float | None = Field(default=None, allow_inf_nan=False)
     model_size: Literal['small', 'medium', 'large'] = 'medium'
     molecules_per_cell: int = Field(default=4, ge=1, le=8)
     population_size: int = Field(default=6, ge=4, le=12)
@@ -139,6 +152,10 @@ def prepare_input(request):
         return 'request.json', request.model_dump_json(indent=2), ['request.json']
     if request.app_id in REACTION_APPS:
         validate_request(request)
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
+    if request.app_id == 'crystal-morphology':
+        request.method = method
+        validate_morphology(request)
         return 'request.json', request.model_dump_json(indent=2), ['request.json']
     if request.smiles or request.task not in {'energy', 'optimize', 'search'}:
         raise ValueError('invalid_method')
@@ -336,7 +353,8 @@ class Manager:
                 job['exit_code'] = await self.process.wait()
             text = log_path.read_text(errors='replace')
             markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE',
-                       'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE', 'mineru': 'EM_AGENT_MINERU_COMPLETE'}
+                       'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE', 'mineru': 'EM_AGENT_MINERU_COMPLETE',
+                       'crystal-morphology': 'EM_AGENT_MORPHOLOGY_COMPLETE'}
             if job['status'] != 'cancelled':
                 success = job['exit_code'] == 0 and markers[job['app_id']].lower() in text.lower() and not job['error']
                 if success and job['app_id'] == 'magus':
@@ -359,6 +377,11 @@ class Manager:
                 if success and job['app_id'] == 'mineru':
                     result = json.loads((directory / 'result.json').read_text())
                     success = verified_mineru(result, directory)
+                    if success:
+                        job['result'] = result
+                if success and job['app_id'] == 'crystal-morphology':
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = verified_morphology(result, request)
                     if success:
                         job['result'] = result
                 job['status'] = 'succeeded' if success else 'failed'

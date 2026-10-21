@@ -77,6 +77,9 @@ class ScienceTests(unittest.TestCase):
                 ('em-magus', [str(root / 'water.xyz'), '--volume-min', '180', '--volume-max', '400']),
                 ('em-reaction', ['lcms2yield', str(root / 'molecules.smi')]),
                 ('em-mineru', [str(root / 'paper.pdf')]),
+                ('em-morphology', ['--additive-percent', '1', '--antisolvent-temp-c', '10',
+                                   '--stirring-rpm', '300', '--concentration-g-ml', '0.06',
+                                   '--solvent-ratio', '0.125']),
             ]
             for name, args in cases:
                 with self.subTest(cli=name), patch.dict('os.environ', {'LOCAL_BACKEND_API_KEY': 'test-key'}), \
@@ -87,6 +90,36 @@ class ScienceTests(unittest.TestCase):
                     self.assertEqual(request.get_method(), 'POST')
                     self.assertEqual(request.get_header('X-em-agent-source'), 'agent')
                     self.assertEqual(request.get_header('X-session-api-key'), 'test-key')
+
+    # @spec CM-003 — Only a verified morphology result publishes predictions
+    def test_morphology_publishes_only_complete_verified_result(self):
+        async def exercise(root):
+            executable = root / 'morphology-model'
+            manager = Manager(root / 'jobs')
+            features = {'添加剂百分比': 1.0, '反溶剂温度(°C)': 10.0, '搅拌速率(rpm)': 300.0,
+                        '浓度(g/ml)': 0.06, '溶剂/反溶剂比值': 0.125}
+            result = {'verified': True, 'app_id': 'crystal-morphology', 'model_id': 'CatBoost',
+                      'class_order': ['其他', '球', '针'], 'prediction_count': 1,
+                      'class_counts': {'其他': 0, '球': 1, '针': 0},
+                      'rows': [{'index': 1, 'features': features, 'predicted_label': '球',
+                                'probabilities': {'其他': 0.2, '球': 0.7, '针': 0.1},
+                                'in_training_range': True}]}
+            request = JobRequest(app_id='crystal-morphology', task='classification', input_mode='single',
+                                 additive_percent=1.0, antisolvent_temp_c=10, stirring_rpm=300,
+                                 concentration_g_ml=0.06, solvent_ratio=0.125)
+            with patch('tools.science_apps.service.application_executable', return_value=str(executable)):
+                for valid in [False, True]:
+                    payload = result if valid else {**result, 'prediction_count': 2}
+                    executable.write_text('#!/bin/sh\necho \'%s\' > result.json\necho EM_AGENT_MORPHOLOGY_COMPLETE\n' % __import__('json').dumps(payload, ensure_ascii=False))
+                    executable.chmod(0o755)
+                    job = manager.submit(request)
+                    await manager.run(job['id'])
+                    detail = manager.detail(job['id'])
+                    self.assertEqual(detail['status'], 'succeeded' if valid else 'failed')
+                    self.assertEqual(detail.get('result'), result if valid else None)
+                    self.assertIsNone(detail['energy_hartree'])
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
 
     def test_bde_only_publishes_complete_verified_results(self):
         async def exercise(root):

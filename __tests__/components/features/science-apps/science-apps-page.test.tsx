@@ -7,6 +7,7 @@ import {
   scienceAppsService,
   SCIENCE_EXAMPLE_XYZ,
   SCIENCE_MAGUS_EXAMPLE_XYZ,
+  SCIENCE_MORPHOLOGY_EXAMPLE_CSV,
   type ScienceApplication,
   type ScienceJobDetail,
 } from "#/api/science-apps-service";
@@ -63,6 +64,25 @@ const applications: ScienceApplication[] = [
     category: "crystal",
     available: true,
     methods: ["MACE-OFF23"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  },
+  {
+    id: "crystal-morphology",
+    name: "晶体形貌判别",
+    category: "crystal",
+    available: true,
+    methods: [
+      "auto",
+      "CatBoost",
+      "LightGBM",
+      "XGBoost",
+      "SVM",
+      "GradientBoosting",
+      "RandomForest",
+    ],
     bases: [],
     max_cores: 8,
     max_memory_mb: 8192,
@@ -320,6 +340,105 @@ describe("manual scientific applications", () => {
       ),
     );
     expect(screen.getByText("SCIENCE$ENERGY_EV_VALUE")).toBeInTheDocument();
+  });
+
+  // @spec CM-001 — Submit the real five-parameter contract and show per-row classes
+  it("submits the five process parameters and renders per-row morphology classes", async () => {
+    const user = userEvent.setup();
+    const features = {
+      添加剂百分比: 1,
+      "反溶剂温度(°C)": 10,
+      "搅拌速率(rpm)": 300,
+      "浓度(g/ml)": 0.06,
+      "溶剂/反溶剂比值": 0.125,
+    };
+    vi.mocked(scienceAppsService.job).mockResolvedValue({
+      ...job,
+      app_id: "crystal-morphology",
+      status: "succeeded",
+      result: {
+        model_id: "CatBoost",
+        prediction_count: 1,
+        class_counts: { 其他: 0, 球: 1, 针: 0 },
+        outside_training_range_count: 0,
+        rows: [
+          {
+            index: 1,
+            features,
+            predicted_label: "球",
+            probabilities: { 其他: 0.2, 球: 0.7, 针: 0.1 },
+            in_training_range: true,
+          },
+        ],
+      },
+    });
+    renderWithProviders(
+      <ScienceAppsPage
+        appId="crystal-morphology"
+        jobId="abc"
+        onSelectJob={vi.fn()}
+      />,
+    );
+    await screen.findByTestId("science-submit");
+    expect(
+      screen.queryByLabelText("SCIENCE$UPLOAD_XYZ"),
+    ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("SCIENCE$MORPHOLOGY_RATIO"), {
+      target: { value: "0.2" },
+    });
+    await user.selectOptions(
+      screen.getByLabelText("SCIENCE$MORPHOLOGY_MODEL"),
+      "CatBoost",
+    );
+    await user.click(screen.getByTestId("science-submit"));
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          app_id: "crystal-morphology",
+          task: "classification",
+          input_mode: "single",
+          method: "CatBoost",
+          additive_percent: 1,
+          antisolvent_temp_c: 10,
+          stirring_rpm: 300,
+          concentration_g_ml: 0.06,
+          solvent_ratio: 0.2,
+          xyz: "",
+        }),
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByText("SCIENCE$MORPHOLOGY_COUNTS")).toBeInTheDocument();
+    expect(screen.getByRole("table")).toHaveTextContent("0.700");
+  });
+
+  it("submits a batch CSV in the fixed five-column format", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ScienceAppsPage
+        appId="crystal-morphology"
+        jobId={null}
+        onSelectJob={vi.fn()}
+      />,
+    );
+    await screen.findByTestId("science-submit");
+    await user.selectOptions(
+      screen.getByLabelText("SCIENCE$MORPHOLOGY_INPUT_MODE"),
+      "batch",
+    );
+    const textarea = screen.getByLabelText("SCIENCE$MORPHOLOGY_BATCH");
+    await user.type(textarea, SCIENCE_MORPHOLOGY_EXAMPLE_CSV);
+    await user.click(screen.getByTestId("science-submit"));
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          app_id: "crystal-morphology",
+          input_mode: "batch",
+          table_csv: SCIENCE_MORPHOLOGY_EXAMPLE_CSV,
+        }),
+        expect.anything(),
+      ),
+    );
   });
 
   it("filters deployed applications and links to the standalone workbench", async () => {

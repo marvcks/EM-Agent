@@ -76,6 +76,46 @@ npx vitest run __tests__/components/features/science-apps/science-apps-page.test
 
 第三方 Canvas Apps 的桌面/移动导航、动态页面入口被隐藏，旧 `/apps` 与 `/extensions/*` 链接重定向科学应用；MCP 安装页不提供原生 Git 账户连接，但保留标准 MCP 服务配置与 Skills/插件功能。此修改是产品界面取舍，不删除服务器已有账户或凭据。
 
+## 晶体形貌判别（LLM-105/PSI 预训练分类）
+
+入口 **科学应用 → 晶体结构预测 → 晶体形貌判别**。输入是五项结晶工艺参数：
+添加剂百分比（%）、反溶剂温度（°C）、搅拌速率（rpm）、浓度（g/ml）、
+溶剂/反溶剂比值；可提交单条条件，或上传表头恰为上述五列的 CSV（最多 500 行，
+每行数值必须有限且在输入范围内）。输出类别为 其他／球／针 及三类的模型概率。
+这是**表格分类模型，不是图像识别或晶体结构预测**。
+
+只加载随附的 `model_results_cache.pkl` 预训练缓存：服务启动/可用性只检查运行时与
+缓存存在，任务运行时校验 SHA-256 与类别/特征契约后推理，不触发重训、不生成模拟数据。
+`--model auto`（默认）按原代码排序（测试准确率、F1、CV、泛化差距更小）选缓存中的
+最佳模型，也可固定 CatBoost/LightGBM/XGBoost/SVM/GradientBoosting/RandomForest。
+SVM 使用缓存中的 RobustScaler；树模型使用原始五维数值。线程不超过申请核数
+（runner 内限制 affinity 并改写模型的 `n_jobs`）。
+
+概率是未经校准的预训练模型输出；训练集只有所附 LLM-105/PSI 83 条案例。
+每行结果带 `in_training_range` 标记，范围之外的行是外推，没有已证明的适用性；
+不得将新体系结果描述为已验证。共用串行队列、8 核/8192 MB 申请、手动页面 900 秒
+（Agent 提交无平台总时长上限）。成功要求退出码 0、完成标记且整份结果通过校验。
+下载 `predictions.csv`（逐行类别与概率）、`result.json`（含类别计数与范围标记）
+与 `results.zip`。
+
+Agent 新对话加载 `crystal-morphology` 使用技能，CLI 与页面共用 `/api/science`：
+
+```sh
+em-morphology submit --additive-percent 1.0 --antisolvent-temp-c 10 --stirring-rpm 300 \
+  --concentration-g-ml 0.06 --solvent-ratio 0.125
+em-morphology submit --table conditions.csv --model CatBoost --cores 2
+em-morphology status JOB_ID
+em-morphology cancel JOB_ID
+em-morphology download JOB_ID ./morphology-results
+```
+
+独立运行时位于 `/opt/em-agent-tools/crystal-morphology`（uv + Python 3.11，
+锁定 numpy/scikit-learn/xgboost/lightgbm/catboost）；共享解释器在
+`/opt/em-agent-tools/python`。`morphology-classify` 选择隔离解释器运行
+`morphology_runner.py`。模型缓存、安装记录与验收在 `/root/EM-Agent-Tools/crystal-morphology`。
+原代码、权重与案例未修改；训练分支默认的无限占核已被禁用，禁止在服务内触发
+完整贝叶斯调参或重训。
+
 ## 2026-10-19 开发纪要
 
 - 新 fork 保留现有 OpenHands Agent 能力，补科学应用手动工作台和第三方 Apps 入口收敛；具体需求记在根 `AGENTS.md`。

@@ -53,6 +53,17 @@ class DeploymentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             deploy.render_compose(COMPOSE.replace('    volumes:\n', '    volumes:\n      - /other:/opt/em-agent-tools/bde:ro\n'), NEW_IMAGE, bde_tools=True)
 
+    # @spec CM-005 — Isolated morphology runtime mounts share the frozen Python
+    def test_morphology_mounts_are_independent_idempotent_and_preserve_rollback(self):
+        result = deploy.render_compose(COMPOSE, NEW_IMAGE, morphology_tools=True)
+        self.assertIn('/opt/em-agent-tools/crystal-morphology:/opt/em-agent-tools/crystal-morphology:ro', result)
+        self.assertIn('/opt/em-agent-tools/python:/opt/em-agent-tools/python:ro', result)
+        self.assertNotIn('/opt/em-agent-tools/bde', result)
+        self.assertEqual(deploy.render_compose(result, NEW_IMAGE, morphology_tools=True), result)
+        self.assertNotIn('/opt/em-agent-tools/crystal-morphology', deploy.render_compose(COMPOSE, OLD_IMAGE, remove_frontend=False))
+        with self.assertRaises(ValueError):
+            deploy.render_compose(COMPOSE.replace('    volumes:\n', '    volumes:\n      - /other:/opt/em-agent-tools/crystal-morphology:ro\n'), NEW_IMAGE, morphology_tools=True)
+
     def test_reaction_mounts_have_independent_readonly_lifecycle(self):
         result = deploy.render_compose(COMPOSE, NEW_IMAGE, reaction_tools=True)
         for source, destination in deploy.REACTION_MOUNTS.items():

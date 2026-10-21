@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Submit crystal-morphology classifications through EM-Agent's shared scientific queue."""
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+FIELDS = ['additive_percent', 'antisolvent_temp_c', 'stirring_rpm',
+          'concentration_g_ml', 'solvent_ratio']
+
+
+def api(path, payload=None):
+    key = os.environ.get('LOCAL_BACKEND_API_KEY') or os.environ.get('OH_SESSION_API_KEYS_0')
+    if not key:
+        raise RuntimeError('Runtime session key is unavailable')
+    request = urllib.request.Request('http://127.0.0.1:8000/api/science' + path,
+        data=json.dumps(payload).encode() if payload is not None else None,
+        headers={'X-Session-API-Key': key, 'X-EM-Agent-Source': 'agent', 'Content-Type': 'application/json'})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return response.read()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest='command', required=True)
+    submit = commands.add_parser('submit')
+    submit.add_argument('--table', type=Path,
+        help='CSV with columns 添加剂百分比,反溶剂温度(°C),搅拌速率(rpm),浓度(g/ml),溶剂/反溶剂比值')
+    for field in FIELDS:
+        submit.add_argument('--' + field.replace('_', '-'), type=float,
+                            help='single-condition mode requires all five parameters')
+    submit.add_argument('--model', choices=['auto', 'CatBoost', 'LightGBM', 'XGBoost',
+                                            'SVM', 'GradientBoosting', 'RandomForest'],
+                        default='auto')
+    submit.add_argument('--cores', type=int, default=2)
+    submit.add_argument('--memory-mb', type=int, default=2048)
+    submit.add_argument('--title', default='')
+    commands.add_parser('apps')
+    commands.add_parser('jobs')
+    for name in ['status', 'cancel', 'download']:
+        command = commands.add_parser(name)
+        command.add_argument('job_id')
+        if name == 'download':
+            command.add_argument('directory', type=Path)
+    args = parser.parse_args()
+    if args.command == 'submit':
+        values = {field: getattr(args, field) for field in FIELDS}
+        if args.table is not None:
+            if any(value is not None for value in values.values()):
+                raise ValueError('Provide --table or all five process parameters, not both')
+            table = args.table.expanduser().resolve()
+            if not 0 < table.stat().st_size <= 32768:
+                raise ValueError('Expected a nonempty CSV up to 32 KB')
+            payload = {'input_mode': 'batch', 'table_csv': table.read_text(encoding='utf-8')}
+        else:
+            if any(value is None for value in values.values()):
+                raise ValueError('Provide --table or all five process parameters')
+            payload = {'input_mode': 'single', **values}
+        result = api('/jobs', {'app_id': 'crystal-morphology', 'task': 'classification',
+                    'method': args.model, 'cores': args.cores, 'memory_mb': args.memory_mb,
+                    'title': args.title, **payload})
+    elif args.command in {'apps', 'jobs'}:
+        result = api('/' + args.command)
+    else:
+        path = '/jobs/' + urllib.parse.quote(args.job_id, safe='')
+        result = api(path + '/cancel', {}) if args.command == 'cancel' else api(path)
+        if args.command == 'download':
+            job = json.loads(result)
+            args.directory.mkdir(parents=True, exist_ok=True)
+            saved = []
+            for entry in job['files']:
+                name = entry['name']
+                destination = args.directory / name
+                if Path(name).name != name or destination.exists() or destination.is_symlink():
+                    raise ValueError('Unsafe or existing download target: ' + name)
+                with destination.open('xb') as stream:
+                    stream.write(api(path + '/files/' + urllib.parse.quote(name, safe='')))
+                saved.append(str(destination))
+            result = json.dumps({'saved': saved}).encode()
+    value = json.loads(result)
+    print(json.dumps(value, ensure_ascii=False, indent=2))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except urllib.error.HTTPError as exc:
+        print(f'Science API HTTP {exc.code}: {exc.read().decode()}', file=sys.stderr)
+        sys.exit(1)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)

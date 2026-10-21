@@ -307,6 +307,12 @@ if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ]; then
       fi
     fi
   done
+  if [ -x /opt/em-agent-tools/crystal-morphology/.venv/bin/python ]; then
+    mkdir -p "$OPENHANDS_DIR/skills"
+    if [ ! -e "$OPENHANDS_DIR/skills/crystal-morphology" ] && [ ! -L "$OPENHANDS_DIR/skills/crystal-morphology" ]; then
+      ln -s /opt/agent-canvas/science_apps/skills/crystal-morphology "$OPENHANDS_DIR/skills/crystal-morphology"
+    fi
+  fi
 fi
 AGENT_SERVER_IMPORT_MODULES="canvas_ui_tool"
 

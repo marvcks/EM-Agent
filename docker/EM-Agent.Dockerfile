@@ -36,6 +36,7 @@ LABEL io.em-agent.upstream.revision="f07aebdf5cdd71f4a05ebcf30f8bef5e4e3b70b9"
 LABEL io.em-agent.magus="1"
 LABEL io.em-agent.reactions="1"
 LABEL io.em-agent.bde="1"
+LABEL io.em-agent.crystal-morphology="1"
 LABEL io.em-agent.analysis="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${SOURCE_COMMIT}
@@ -62,5 +63,7 @@ RUN install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magu
  && install -m 755 /opt/agent-canvas/science_apps/bde-analyze /usr/local/bin/bde-analyze \
  && install -m 755 /opt/agent-canvas/science_apps/em-bde /usr/local/bin/em-bde \
  && install -m 755 /opt/agent-canvas/science_apps/mineru-parse /usr/local/bin/mineru-parse \
- && install -m 755 /opt/agent-canvas/science_apps/em-mineru /usr/local/bin/em-mineru
+ && install -m 755 /opt/agent-canvas/science_apps/em-mineru /usr/local/bin/em-mineru \
+ && install -m 755 /opt/agent-canvas/science_apps/morphology-classify /usr/local/bin/morphology-classify \
+ && install -m 755 /opt/agent-canvas/science_apps/em-morphology /usr/local/bin/em-morphology
 USER openhands

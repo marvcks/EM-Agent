@@ -5,7 +5,7 @@
 - 当前开发仓库是本目录 `EM-Agent-OpenHands`，fork 为 `marvcks/EM-Agent`，开发分支 `codex/em-agent-ui`。旧 `/Users/xhxu/Documents/EM-Agent` 的 Google ADK 项目仅作界面参考，不再扩展旧后端。
 - 产品定位：OpenHands 提供 Agent、工作区、MCP、Skills、终端和文件能力，保留这些功能；前端采用 EM-Agent 的浅色科研工作台外观。隐藏第三方 Apps 管理、扩展页面及原生 Git 账户连接入口；保留自定义 MCP 配置、Skills 和插件。
 - “科学应用”是用户手动操作的软件工作台：选应用 → 上传/粘贴 XYZ → 配置参数 → 提交 → 日志/停止/结果下载。它不通过 Agent 或 LLM 调用。用户日后自行编写材料发现等研究流程的 Skills，不要重写 Agent 编排。
-- 已接入 xTB、ORCA、Gaussian，按服务器实际可执行文件检测是否可用。扩展应用在 `tools/science_apps/service.py` 的目录和输入适配器中添加，并同步请求类型、UI 说明与测试。不得把模拟结果标成真实计算。
+- 已接入 xTB、ORCA、Gaussian、MAGUS（MACE-OFF23 分子晶体搜索）与晶体形貌判别（LLM-105/PSI 预训练表格分类），按实际可执行文件与必要运行时/模型检测是否可用。晶体形貌判别输入为五项结晶工艺参数或同表头 CSV，输出“其他/球/针”及未校准概率；训练范围之外的行标记为外推。扩展应用在 `tools/science_apps/service.py` 的目录和输入适配器中添加，并同步请求类型、UI 说明与测试。不得把模拟结果标成真实计算。
 - 当前仅面向火山单机演示（SSH 别名 `huoshan`，32 逻辑核、约 64 GB），无需设计复杂多租户/高并发系统。科学任务串行，队列最多 10 项；每项最多 8 核、申请内存 8 GB、最多 128 原子；手动页面任务运行最多 15 分钟，Agent CLI 提交的任务无平台总时长上限，由 Agent 监控并决定停止。xTB 自行管理内存，这不是操作系统内存隔离。
 - 手动科学任务属于本 fork 的独立服务 `/api/science`，不改变 SDK/Agent Server API；前端唯一适配器 `src/api/science-apps-service.ts` 使用同源和运行时 session key，不能跟随对话后端切换。此服务是下方仓库所有权/API 规则的明确项目例外。
 - 科学应用通过 `docker/EM-Agent.Dockerfile` 启用。`docker/entrypoint.sh` 用 `EM_AGENT_SCIENCE_APPS=1` 启动 loopback 服务 `:18002`，入口代理 `/api/science`，数据保存到已有持久卷 `~/.openhands/science-apps`。重启后未结束任务标为失败，不自动重跑。
@@ -67,6 +67,7 @@ Detailed contributor knowledge is split into skills so it loads only for relevan
 
 | Skill | Use for |
 |---|---|
+| [`huoshan-science-tools`](.agents/skills/huoshan-science-tools/SKILL.md) | 在火山安装科学软件，并接入 EM-Agent 对话与科学工具广场的手动参数页面；包含环境隔离、两个入口、验收及部署交接。 |
 | [`telemetry-analytics`](.agents/skills/telemetry-analytics/SKILL.md) | PostHog, telemetry consent/identity, typed tracking events, Cloud funnel observability, and onboarding instrumentation. |
 | [`e2e-testing`](.agents/skills/e2e-testing/SKILL.md) | Live or mock-LLM Playwright suites, Docker E2E, E2E CI/reporting, artifacts, and failure diagnosis. |
 | [`frontend-api-contracts`](.agents/skills/frontend-api-contracts/SKILL.md) | `src/api`, typed Agent Server calls, Cloud/runtime transport, compatibility, backends, settings, secrets, auth, and conversation contracts. |

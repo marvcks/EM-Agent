@@ -32,6 +32,7 @@ import {
 import { BDEForm, BDEResult } from "./bde-form";
 import { ReactionForm } from "./reaction-form";
 import { MinerUForm } from "./mineru-form";
+import { MorphologyForm, MorphologyResult } from "./morphology-form";
 
 const DESCRIPTION_KEYS = {
   mineru: I18nKey.SCIENCE$MINERU_DESCRIPTION,
@@ -40,6 +41,7 @@ const DESCRIPTION_KEYS = {
   orca: I18nKey.SCIENCE$ORCA_DESCRIPTION,
   gaussian: I18nKey.SCIENCE$GAUSSIAN_DESCRIPTION,
   magus: I18nKey.SCIENCE$MAGUS_DESCRIPTION,
+  "crystal-morphology": I18nKey.SCIENCE$MORPHOLOGY_DESCRIPTION,
   aizynthfinder: I18nKey.SCIENCE$AIZYNTH_DESCRIPTION,
   lcms2yield: I18nKey.SCIENCE$LCMS_DESCRIPTION,
 };
@@ -66,6 +68,7 @@ const ERROR_KEYS: Record<string, I18nKey> = {
   calculation_failed: I18nKey.SCIENCE$CALCULATION_FAILED,
   invalid_magus_molecule: I18nKey.SCIENCE$MAGUS_INPUT_ERROR,
   invalid_volume: I18nKey.SCIENCE$VOLUME_ERROR,
+  invalid_morphology_input: I18nKey.SCIENCE$MORPHOLOGY_INPUT_ERROR,
 };
 const CATEGORY_KEYS = {
   document: I18nKey.SCIENCE$DOCUMENT_CATEGORY,
@@ -248,6 +251,12 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                   onCreated={onSelectJob}
                   renderError={(error) => <ErrorMessage error={error} />}
                 />
+              ) : selected.id === "crystal-morphology" ? (
+                <MorphologyForm
+                  app={selected}
+                  onCreated={onSelectJob}
+                  renderError={(error) => <ErrorMessage error={error} />}
+                />
               ) : selected.category === "reaction" ? (
                 <ReactionForm
                   key={selected.id}
@@ -351,9 +360,11 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                       {t(
                         app.category === "document"
                           ? I18nKey.SCIENCE$DOCUMENT_UPLOAD
-                          : app.category === "reaction"
-                            ? I18nKey.SCIENCE$SMILES_INPUT
-                            : I18nKey.SCIENCE$XYZ_INPUT,
+                          : app.id === "crystal-morphology"
+                            ? I18nKey.SCIENCE$MORPHOLOGY_TABLE_INPUT
+                            : app.category === "reaction"
+                              ? I18nKey.SCIENCE$SMILES_INPUT
+                              : I18nKey.SCIENCE$XYZ_INPUT,
                       )}
                     </span>
                   </div>
@@ -853,6 +864,9 @@ function JobResult({ jobId }: { jobId: string | null }) {
           {job.app_id === "bde" && job.status === "succeeded" && job.result && (
             <BDEResult result={job.result} />
           )}
+          {job.app_id === "crystal-morphology" &&
+            job.status === "succeeded" &&
+            job.result && <MorphologyResult result={job.result} />}
           {job.app_id === "mineru" && job.status === "succeeded" && (
             <p className="em-science-help">
               {t(I18nKey.SCIENCE$MINERU_RESULT_NOTE)}

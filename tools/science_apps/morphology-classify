@@ -1,0 +1,3 @@
+#!/bin/sh
+exec /opt/em-agent-tools/crystal-morphology/.venv/bin/python -I \
+  /opt/agent-canvas/science_apps/morphology_runner.py "$@"

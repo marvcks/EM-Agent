@@ -1,0 +1,17 @@
+[project]
+name = "em-agent-crystal-morphology"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "numpy==1.26.4",
+  "scipy==1.14.1",
+  "scikit-learn==1.5.2",
+  "xgboost==2.1.2",
+  "lightgbm==4.6.0",
+  "catboost==1.2.8",
+  "threadpoolctl==3.6.0",
+]
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true

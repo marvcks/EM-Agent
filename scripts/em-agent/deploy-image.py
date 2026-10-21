@@ -27,6 +27,8 @@ SCIENCE_MOUNTS = {
 REACTION_MOUNTS = {f'/opt/em-agent-tools/{name}': f'/opt/em-agent-tools/{name}'
                    for name in ('python', 'aizynthfinder', 'lcms2yield')}
 BDE_MOUNTS = {f'/opt/em-agent-tools/{name}': f'/opt/em-agent-tools/{name}' for name in ('python', 'bde')}
+MORPHOLOGY_MOUNTS = {'/opt/em-agent-tools/crystal-morphology': '/opt/em-agent-tools/crystal-morphology',
+                     '/opt/em-agent-tools/python': '/opt/em-agent-tools/python'}
 ANALYSIS_MOUNTS = {f'/opt/em-agent-tools/{name}': f'/opt/em-agent-tools/{name}' for name in ('python', 'analysis')}
 PROBE = '''
 import json, os, urllib.request, urllib.parse
@@ -69,7 +71,7 @@ def run(*args, input=None):
     return result.stdout
 
 
-def render_compose(original, image_id, remove_frontend=True, science_tools=False, reaction_tools=False, bde_tools=False, analysis_tools=False):
+def render_compose(original, image_id, remove_frontend=True, science_tools=False, reaction_tools=False, bde_tools=False, morphology_tools=False, analysis_tools=False):
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id):
         raise ValueError('Expected an immutable local image ID')
     if len(re.findall(r'^    image:.*$', original, flags=re.M)) != 1:
@@ -86,7 +88,7 @@ def render_compose(original, image_id, remove_frontend=True, science_tools=False
             if destination in result:
                 raise ValueError(f'Another mount owns {destination}')
             additions.append(line)
-    tool_mounts = {**(SCIENCE_MOUNTS if science_tools else {}), **(REACTION_MOUNTS if reaction_tools else {}), **(BDE_MOUNTS if bde_tools else {}), **(ANALYSIS_MOUNTS if analysis_tools else {})}
+    tool_mounts = {**(SCIENCE_MOUNTS if science_tools else {}), **(REACTION_MOUNTS if reaction_tools else {}), **(BDE_MOUNTS if bde_tools else {}), **(MORPHOLOGY_MOUNTS if morphology_tools else {}), **(ANALYSIS_MOUNTS if analysis_tools else {})}
     if tool_mounts:
         for source, destination in tool_mounts.items():
             line = f'      - {source}:{destination}:ro\n'
@@ -196,6 +198,12 @@ def deploy(root, image, commit):
                     ('.venv/bin/python', 'psi4/bin/python', 'manifest.json', 'models/model.tar.gz', 'models/preprocessor.json', 'models/model/saved_model.pb')]
         if not all(path.is_file() and path.stat().st_size > 0 for path in required):
             raise RuntimeError('Prepare isolated ALFABET/Psi4 runtimes and verified BDE model assets before deploying')
+    morphology_tools = labels.get('io.em-agent.crystal-morphology') == '1'
+    if morphology_tools:
+        required = [Path('/opt/em-agent-tools/crystal-morphology') / name for name in
+                    ('.venv/bin/python', 'manifest.json', 'models/model_results_cache.pkl')]
+        if not all(path.is_file() and path.stat().st_size > 0 for path in required):
+            raise RuntimeError('Prepare the isolated crystal-morphology runtime and verified model cache before deploying')
     # @spec AR-004 — Candidate image and persistent runtime share the exact lock.
     analysis_tools = labels.get('io.em-agent.analysis') == '1'
     if analysis_tools:
@@ -206,7 +214,7 @@ def deploy(root, image, commit):
         expected_lock = run('docker', 'run', '--rm', '--entrypoint', 'cat', info['Id'], '/opt/agent-canvas/em_agent_runtime/uv.lock')
         if manifest.get('lock_sha256') != hashlib.sha256(expected_lock.encode()).hexdigest():
             raise RuntimeError('Analysis runtime lock does not match the candidate image')
-    candidate = render_compose(original, info['Id'], science_tools=science_tools, reaction_tools=reaction_tools, bde_tools=bde_tools, analysis_tools=analysis_tools)
+    candidate = render_compose(original, info['Id'], science_tools=science_tools, reaction_tools=reaction_tools, bde_tools=bde_tools, morphology_tools=morphology_tools, analysis_tools=analysis_tools)
     fallback = render_compose(original, previous['Image'], remove_frontend=False)
     atomic_write(release / 'compose-candidate.yaml', candidate)
     atomic_write(release / 'compose-rollback.yaml', fallback)

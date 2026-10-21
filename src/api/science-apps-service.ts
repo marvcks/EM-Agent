@@ -15,10 +15,20 @@ export const SCIENCE_APP_IDS = [
   "orca",
   "gaussian",
   "magus",
+  "crystal-morphology",
   "aizynthfinder",
   "lcms2yield",
   "bde",
 ] as const;
+export const SCIENCE_MORPHOLOGY_FEATURES = [
+  "添加剂百分比",
+  "反溶剂温度(°C)",
+  "搅拌速率(rpm)",
+  "浓度(g/ml)",
+  "溶剂/反溶剂比值",
+] as const;
+export const SCIENCE_MORPHOLOGY_EXAMPLE_CSV =
+  "添加剂百分比,反溶剂温度(°C),搅拌速率(rpm),浓度(g/ml),溶剂/反溶剂比值\n1,10,300,0.06,0.125\n5,5,300,0.06,0.167\n";
 export const SCIENCE_ROUTE_EXAMPLE = "CC(=O)Oc1ccccc1C(=O)O";
 export const SCIENCE_CF_EXAMPLE =
   "CN(N=C1)C=C1CC2(CC(F)(F)C2)NC(CC3=CC(C=C(Br)C=N4)=C4C=C3)C5=C(O)C=CC=N5";
@@ -60,7 +70,8 @@ export interface ScienceJobRequest {
     | "retrosynthesis"
     | "correction_factor"
     | "bde"
-    | "textify";
+    | "textify"
+    | "classification";
   document_name?: string;
   language?: "en" | "ch";
   enable_formula?: boolean;
@@ -71,6 +82,13 @@ export interface ScienceJobRequest {
   multiplicity: number;
   cores: number;
   memory_mb: number;
+  input_mode?: "single" | "batch";
+  table_csv?: string;
+  additive_percent?: number;
+  antisolvent_temp_c?: number;
+  stirring_rpm?: number;
+  concentration_g_ml?: number;
+  solvent_ratio?: number;
   model_size?: "small" | "medium" | "large";
   molecules_per_cell?: number;
   population_size?: number;
@@ -116,6 +134,17 @@ export interface ScienceJob {
     route_count?: number;
     solved_count?: number;
     correction_factors?: { smiles: string; cf: number }[];
+    model_id?: string;
+    prediction_count?: number;
+    class_counts?: Record<string, number>;
+    outside_training_range_count?: number;
+    rows?: {
+      index: number;
+      features: Record<string, number>;
+      predicted_label: string;
+      probabilities: Record<string, number>;
+      in_training_range: boolean;
+    }[];
   };
   exit_code: number | null;
 }

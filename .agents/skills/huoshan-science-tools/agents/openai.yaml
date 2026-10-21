@@ -1,0 +1,3 @@
+interface:
+  display_name: "火山科学工具安装与上架"
+  short_description: "在火山安装科学软件，并接入 EM-Agent 对话与手动工具页面"
