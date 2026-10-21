@@ -4,14 +4,21 @@ import {
   RUNTIME_STARTING_STATES,
 } from "#/types/agent-state";
 import { useActiveConversation } from "./query/use-active-conversation";
-import { isExecutionActive, isExecutionErrored } from "#/utils/status";
+import {
+  isExecutionActive,
+  isExecutionErrored,
+  isExecutionPaused,
+} from "#/utils/status";
 
 interface UseRuntimeIsReadyOptions {
   allowAgentError?: boolean;
+  /** Local workspace reads can continue while the agent's execution is paused. */
+  allowAgentPaused?: boolean;
 }
 
 export const useRuntimeIsReady = ({
   allowAgentError = false,
+  allowAgentPaused = false,
 }: UseRuntimeIsReadyOptions = {}): boolean => {
   const { data: conversation } = useActiveConversation();
   const { curAgentState } = useAgentState();
@@ -21,6 +28,7 @@ export const useRuntimeIsReady = ({
 
   return (
     (isExecutionActive(conversation?.execution_status) ||
+      (allowAgentPaused && isExecutionPaused(conversation?.execution_status)) ||
       (allowAgentError &&
         isExecutionErrored(conversation?.execution_status))) &&
     !inactiveStates.includes(curAgentState)

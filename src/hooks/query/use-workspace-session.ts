@@ -50,7 +50,11 @@ export function useWorkspaceSession(): {
   error: Error | null;
 } {
   const { data: conversation } = useActiveConversation();
-  const runtimeIsReady = useRuntimeIsReady({ allowAgentError: true });
+  // @spec WFD-003 — Local static previews remain available after agent pause
+  const runtimeIsReady = useRuntimeIsReady({
+    allowAgentError: true,
+    allowAgentPaused: true,
+  });
 
   const conversationId = conversation?.id;
   const conversationUrl = conversation?.conversation_url;

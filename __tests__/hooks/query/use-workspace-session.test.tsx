@@ -46,7 +46,11 @@ vi.mock("#/hooks/query/use-active-conversation", () => ({
 
 const useRuntimeIsReadyMock = vi.fn();
 vi.mock("#/hooks/use-runtime-is-ready", () => ({
-  useRuntimeIsReady: () => useRuntimeIsReadyMock(),
+  useRuntimeIsReady: (...args: unknown[]) => useRuntimeIsReadyMock(...args),
+}));
+
+vi.mock("#/hooks/use-agent-state", () => ({
+  useAgentState: () => ({ curAgentState: "paused" }),
 }));
 
 function makeWrapper() {
@@ -92,9 +96,37 @@ afterEach(() => {
 
 describe("useWorkspaceSession", () => {
   describe("local backend", () => {
+    // @spec WFD-003 — Static previews remain available while the agent is paused
+    it("mints a workspace session for a paused local conversation", async () => {
+      const { useRuntimeIsReady } = await vi.importActual<
+        typeof import("#/hooks/use-runtime-is-ready")
+      >("#/hooks/use-runtime-is-ready");
+      useRuntimeIsReadyMock.mockImplementation(useRuntimeIsReady);
+      getActiveBackendMock.mockReturnValue({ backend: { kind: "local" } });
+      useActiveConversationMock.mockReturnValue({
+        data: { id: "conv-1", execution_status: "paused" },
+      });
+      getAgentServerClientOptionsMock.mockReturnValue({
+        host: "http://localhost:8000",
+      });
+      startWorkspaceSessionMock.mockResolvedValue(
+        "http://localhost:8000/api/conversations/conv-1/workspace/",
+      );
+      const { result } = renderHook(() => useWorkspaceSession(), {
+        wrapper: makeWrapper(),
+      });
+      await waitFor(() =>
+        expect(result.current.data?.baseUrl).toContain("/conv-1/workspace/"),
+      );
+    });
+
     it("calls startWorkspaceSession and exposes the returned baseUrl", async () => {
       getActiveBackendMock.mockReturnValue({
-        backend: { id: "local-1", kind: "local", host: "http://localhost:8000" },
+        backend: {
+          id: "local-1",
+          kind: "local",
+          host: "http://localhost:8000",
+        },
       });
       useActiveConversationMock.mockReturnValue({
         data: {
@@ -125,8 +157,7 @@ describe("useWorkspaceSession", () => {
 
       expect(getAgentServerClientOptionsMock).toHaveBeenCalledTimes(1);
       expect(getAgentServerClientOptionsMock).toHaveBeenCalledWith({
-        conversationUrl:
-          "https://agent.example.com/api/conversations/conv-1",
+        conversationUrl: "https://agent.example.com/api/conversations/conv-1",
         sessionApiKey: "key-abc",
       });
       expect(RemoteWorkspace).toHaveBeenCalledTimes(1);
@@ -177,8 +208,7 @@ describe("useWorkspaceSession", () => {
     useActiveConversationMock.mockReturnValue({
       data: {
         id: "conv-1",
-        conversation_url:
-          "https://agent.example.com/api/conversations/conv-1",
+        conversation_url: "https://agent.example.com/api/conversations/conv-1",
         session_api_key: "key-abc",
       },
     });

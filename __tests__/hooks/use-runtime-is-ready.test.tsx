@@ -94,6 +94,25 @@ describe("useRuntimeIsReady", () => {
     expect(result.current).toBe(false);
   });
 
+  // @spec WFD-003 — A paused local agent retains workspace access
+  it("allows paused workspace access only when explicitly requested", () => {
+    vi.mocked(useActiveConversation).mockReturnValue(
+      asMockReturnValue<ReturnType<typeof useActiveConversation>>({
+        data: {
+          ...makeConversation(),
+          execution_status: ExecutionStatus.PAUSED,
+        },
+      }),
+    );
+    vi.mocked(useAgentState).mockReturnValue({
+      curAgentState: AgentState.PAUSED,
+    });
+    const { result } = renderHook(() =>
+      useRuntimeIsReady({ allowAgentPaused: true }),
+    );
+    expect(result.current).toBe(true);
+  });
+
   it("allows runtime-backed tabs to stay ready when the agent errors", () => {
     vi.mocked(useAgentState).mockReturnValue({
       curAgentState: AgentState.ERROR,

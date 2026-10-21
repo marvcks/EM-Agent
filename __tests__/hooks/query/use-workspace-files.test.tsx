@@ -155,26 +155,30 @@ describe("useWorkspaceFiles — local backend", () => {
     expect(result.current.isTruncated).toBe(false);
   });
 
-  it("lists diagnostic files while the conversation is in Error", async () => {
-    const { useRuntimeIsReady } = await vi.importActual<
-      typeof import("#/hooks/use-runtime-is-ready")
-    >("#/hooks/use-runtime-is-ready");
-    useRuntimeIsReadyMock.mockImplementation(useRuntimeIsReady);
-    useActiveConversationMock.mockReturnValue({
-      data: { ...conversation, execution_status: "error" },
-    });
-    executeCommandSpy.mockResolvedValue({
-      exit_code: 0,
-      stdout: "./evidence/checkpoint.json\n",
-      stderr: "",
-    });
-    const { result } = renderHook(() => useWorkspaceFiles(), {
-      wrapper: makeWrapper(),
-    });
-    await waitFor(() =>
-      expect(result.current.data).toEqual(["evidence/checkpoint.json"]),
-    );
-  });
+  // @spec WFD-003 — Local workspace remains readable while the agent is paused
+  it.each(["error", "paused"])(
+    "lists local files while execution is %s",
+    async (execution_status) => {
+      const { useRuntimeIsReady } = await vi.importActual<
+        typeof import("#/hooks/use-runtime-is-ready")
+      >("#/hooks/use-runtime-is-ready");
+      useRuntimeIsReadyMock.mockImplementation(useRuntimeIsReady);
+      useActiveConversationMock.mockReturnValue({
+        data: { ...conversation, execution_status },
+      });
+      executeCommandSpy.mockResolvedValue({
+        exit_code: 0,
+        stdout: "./evidence/checkpoint.json\n",
+        stderr: "",
+      });
+      const { result } = renderHook(() => useWorkspaceFiles(), {
+        wrapper: makeWrapper(),
+      });
+      await waitFor(() =>
+        expect(result.current.data).toEqual(["evidence/checkpoint.json"]),
+      );
+    },
+  );
 
   it("lists files via bash find and does not touch git changes", async () => {
     executeCommandSpy.mockResolvedValue({
@@ -197,6 +201,22 @@ describe("useWorkspaceFiles — local backend", () => {
 describe("useWorkspaceFiles — cloud backend", () => {
   beforeEach(() => {
     storeBackendKind = "cloud";
+  });
+
+  it("keeps a paused cloud runtime unavailable", async () => {
+    const { useRuntimeIsReady } = await vi.importActual<
+      typeof import("#/hooks/use-runtime-is-ready")
+    >("#/hooks/use-runtime-is-ready");
+    useRuntimeIsReadyMock.mockImplementation(useRuntimeIsReady);
+    useActiveConversationMock.mockReturnValue({
+      data: { ...conversation, execution_status: "paused" },
+    });
+    const { result } = renderHook(() => useWorkspaceFiles(), {
+      wrapper: makeWrapper(),
+    });
+    expect(result.current.data).toBeUndefined();
+    expect(listCloudFilesMock).not.toHaveBeenCalled();
+    expect(executeCommandSpy).not.toHaveBeenCalled();
   });
 
   it("lists the full tree via the cloud files endpoint without running bash", async () => {

@@ -30,6 +30,12 @@ Bundled catalog skills use the persisted `enabled_skills` allow-list defaulted f
 
 ## Workspace files
 
+Local workspace listing, file reads and static preview sessions opt into
+`useRuntimeIsReady({ allowAgentError: true, allowAgentPaused: true })` so a paused
+agent's outputs remain accessible without resuming execution. Keep that opt-in
+local: a paused cloud sandbox may be unavailable. See WFD-003 in
+`specs/workspace-file-discovery.md`.
+
 Chat attachment size limits belong to `src/utils/file-validation.ts`: 50 MiB per
 file and 100 MiB per message, including images and existing attachments. Keep
 selection, drag/drop, and send paths on this shared validator; exercise the

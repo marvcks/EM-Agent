@@ -141,7 +141,12 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  */
 export function useWorkspaceFileContent(relativePath: string | null) {
   const { data: conversation } = useActiveConversation();
-  const runtimeIsReady = useRuntimeIsReady({ allowAgentError: true });
+  const isCloud = getActiveBackend().backend.kind === "cloud";
+  // @spec WFD-003 — Read local results without resuming agent execution
+  const runtimeIsReady = useRuntimeIsReady({
+    allowAgentError: true,
+    allowAgentPaused: !isCloud,
+  });
   const { data: workspaceSession } = useWorkspaceSession();
   // Bumped on every agent file-editor mutation (not shell commands) and on
   // the Files tab Refresh, so the query refetches the currently-selected
@@ -161,7 +166,6 @@ export function useWorkspaceFileContent(relativePath: string | null) {
   const selectedRepository = conversation?.selected_repository;
   const workingDir = conversation?.workspace?.working_dir?.trim();
   const baseUrl = workspaceSession?.baseUrl;
-  const isCloud = getActiveBackend().backend.kind === "cloud";
 
   // The cloud `/file` endpoint downloads via the runtime's
   // `/api/file/download`, which rejects relative paths (400 → the cloud API

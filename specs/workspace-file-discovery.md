@@ -18,3 +18,9 @@
 - Saved preferences survive reload. Missing or invalid values fall back to conservative defaults.
 - Reset prepares the defaults for Save; Cancel discards the form draft. Failed saves keep the dialog open with an error.
 - Switching workspace or backend discards the open editor. Cloud never displays the editor or saves these settings.
+
+### WFD-003: Paused local workspace access
+
+- Pausing a local agent leaves its workspace files available for listing, reading and static previews, including PDFs and generated HTML.
+- Browsing files must not resume agent execution or change the conversation's working directory.
+- Loading and initialization still gate access. Cloud paused-runtime behavior and other runtime consumers keep their existing readiness checks.

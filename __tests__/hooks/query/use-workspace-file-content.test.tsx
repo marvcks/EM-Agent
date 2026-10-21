@@ -112,25 +112,29 @@ describe("useWorkspaceFileContent", () => {
     return new TextEncoder().encode(value).buffer as ArrayBuffer;
   }
 
-  it("reads a diagnostic file while the conversation is in Error", async () => {
-    const { useRuntimeIsReady } = await vi.importActual<
-      typeof import("#/hooks/use-runtime-is-ready")
-    >("#/hooks/use-runtime-is-ready");
-    useRuntimeIsReadyMock.mockImplementation(useRuntimeIsReady);
-    useActiveConversationMock.mockReturnValue({
-      data: { id: "conv-1", execution_status: "error" },
-    });
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 200,
-      arrayBuffer: () => Promise.resolve(arrayBufferFromString("diagnostic")),
-    });
-    const { result } = renderHook(
-      () => useWorkspaceFileContent("evidence/checkpoint.txt"),
-      { wrapper: makeWrapper() },
-    );
-    await waitFor(() => expect(result.current.data?.text).toBe("diagnostic"));
-  });
+  // @spec WFD-003 — Local workspace remains readable while the agent is paused
+  it.each(["error", "paused"])(
+    "reads local file content while execution is %s",
+    async (execution_status) => {
+      const { useRuntimeIsReady } = await vi.importActual<
+        typeof import("#/hooks/use-runtime-is-ready")
+      >("#/hooks/use-runtime-is-ready");
+      useRuntimeIsReadyMock.mockImplementation(useRuntimeIsReady);
+      useActiveConversationMock.mockReturnValue({
+        data: { id: "conv-1", execution_status },
+      });
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        arrayBuffer: () => Promise.resolve(arrayBufferFromString("diagnostic")),
+      });
+      const { result } = renderHook(
+        () => useWorkspaceFileContent("evidence/checkpoint.txt"),
+        { wrapper: makeWrapper() },
+      );
+      await waitFor(() => expect(result.current.data?.text).toBe("diagnostic"));
+    },
+  );
 
   it("returns a static URL on the workspace fileserver for text content", async () => {
     fetchMock.mockResolvedValue({

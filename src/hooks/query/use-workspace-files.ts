@@ -44,7 +44,11 @@ function normalizePath(path: string): string {
  */
 function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
   const { data: conversation } = useActiveConversation();
-  const runtimeIsReady = useRuntimeIsReady({ allowAgentError: true });
+  // @spec WFD-003 — Pausing a local agent does not remove its workspace
+  const runtimeIsReady = useRuntimeIsReady({
+    allowAgentError: true,
+    allowAgentPaused: true,
+  });
 
   const conversationId = conversation?.id;
   const conversationUrl = conversation?.conversation_url;
