@@ -307,6 +307,12 @@ if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ]; then
       fi
     fi
   done
+  if [ -x /opt/em-agent-tools/cnt2d/.venv/bin/python ]; then
+    mkdir -p "$OPENHANDS_DIR/skills"
+    if [ ! -e "$OPENHANDS_DIR/skills/cnt2d" ] && [ ! -L "$OPENHANDS_DIR/skills/cnt2d" ]; then
+      ln -s /opt/agent-canvas/science_apps/skills/cnt2d "$OPENHANDS_DIR/skills/cnt2d"
+    fi
+  fi
   if [ -x /opt/em-agent-tools/crystal-morphology/.venv/bin/python ]; then
     mkdir -p "$OPENHANDS_DIR/skills"
     if [ ! -e "$OPENHANDS_DIR/skills/crystal-morphology" ] && [ ! -L "$OPENHANDS_DIR/skills/crystal-morphology" ]; then

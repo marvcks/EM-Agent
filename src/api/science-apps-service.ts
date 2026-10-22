@@ -10,6 +10,7 @@ export const SCIENCE_EXAMPLE_XYZ =
 export const SCIENCE_MAGUS_EXAMPLE_XYZ =
   "5\nMethane\nC 0 0 0\nH 0.63 0.63 0.63\nH -0.63 -0.63 0.63\nH -0.63 0.63 -0.63\nH 0.63 -0.63 -0.63\n";
 export const SCIENCE_APP_IDS = [
+  "cnt2d",
   "mineru",
   "xtb",
   "orca",
@@ -33,6 +34,28 @@ export const SCIENCE_ROUTE_EXAMPLE = "CC(=O)Oc1ccccc1C(=O)O";
 export const SCIENCE_CF_EXAMPLE =
   "CN(N=C1)C=C1CC2(CC(F)(F)C2)NC(CC3=CC(C=C(Br)C=N4)=C4C=C3)C5=C(O)C=CC=N5";
 export type ScienceAppId = (typeof SCIENCE_APP_IDS)[number];
+export const SCIENCE_CNT_DEFAULTS = {
+  box_size: 100,
+  cnt_length: 10,
+  cnt_width: 1,
+  surface_width: 0.1,
+  filler_area_fraction_target: 0.01,
+  angle_min: -90,
+  angle_max: 90,
+  length_unit: "mm",
+  cnt_k: 400,
+  pvdf_k: 0.146,
+  surface_k: 7.642,
+  t_left: 308,
+  t_right: 288,
+  bulk_size: 5,
+  interface_layers: 2,
+} as const;
+export type ScienceCNTParameters = {
+  [K in keyof typeof SCIENCE_CNT_DEFAULTS]: K extends "length_unit"
+    ? "m" | "cm" | "mm" | "um" | "nm"
+    : number;
+};
 export type ScienceJobStatus =
   | "queued"
   | "running"
@@ -43,6 +66,7 @@ export interface ScienceApplication {
   id: ScienceAppId;
   name: string;
   category:
+    | "thermal"
     | "semiempirical"
     | "quantum"
     | "crystal"
@@ -57,6 +81,9 @@ export interface ScienceApplication {
   timeout_seconds: number;
 }
 export interface ScienceJobRequest {
+  cnt_parameters?: ScienceCNTParameters;
+  cnt_corners?: string;
+  cnt_seed?: number;
   app_id: ScienceAppId;
   xyz: string;
   smiles?: string;
@@ -71,7 +98,8 @@ export interface ScienceJobRequest {
     | "correction_factor"
     | "bde"
     | "textify"
-    | "classification";
+    | "classification"
+    | "conduction";
   document_name?: string;
   language?: "en" | "ch";
   enable_formula?: boolean;
@@ -112,6 +140,15 @@ export interface ScienceJob {
   energy_hartree: number | null;
   energy_ev?: number | null;
   result?: {
+    unit?: string;
+    metrics?: {
+      Keff_X: number;
+      CNT_Number: number;
+      Triangles: number;
+      Energy_Balance_Error: number;
+      Gradient_Flux_Balance_Error: number;
+      Filler_Area_Fraction_Mesh: number;
+    };
     markdown_file?: string;
     markdown_characters?: number;
     bundle_file?: string;

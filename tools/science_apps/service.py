@@ -29,6 +29,7 @@ from .reaction_runner import REACTION_APPS, runtime_available, validate_request,
 from .bde_runner import bde_available, validate_bde, verified_bde
 from .mineru_runner import MAX_DOCUMENT_BYTES, mineru_available, validate_document, verified_mineru
 from .morphology_runner import morphology_available, validate_morphology, verified_morphology
+from .cnt2d_runner import cnt2d_available, validate_cnt2d, verified_cnt2d
 
 PREFIX = '/api/science'
 MAX_LOG_BYTES = 10 * 1024 * 1024
@@ -36,6 +37,7 @@ TIMEOUT_SECONDS = 900
 ACTIVE = {'queued', 'running'}
 ELEMENTS = ('H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og').split()
 APPLICATIONS = {
+    'cnt2d': {'name': 'CNT 二维导热', 'executable': 'cnt2d-solve', 'methods': ['FEM-P2'], 'bases': [], 'category': 'thermal'},
     'mineru': {'name': 'MinerU', 'executable': 'mineru-parse', 'methods': ['vlm', 'pipeline'], 'bases': [], 'category': 'document'},
     'bde': {'name': 'BDE', 'executable': 'bde-analyze', 'methods': ['ALFABET', 'Psi4'], 'bases': [], 'category': 'bond'},
     'xtb': {'name': 'xTB', 'executable': 'xtb', 'methods': ['GFN2-xTB', 'GFN1-xTB'], 'bases': [], 'category': 'semiempirical'},
@@ -52,6 +54,8 @@ APPLICATIONS = {
 
 def application_executable(app_id):
     executable = shutil.which(APPLICATIONS[app_id]['executable'])
+    if app_id == 'cnt2d' and not cnt2d_available():
+        return None
     if app_id == 'mineru' and not mineru_available():
         return None
     if app_id == 'bde' and not bde_available():
@@ -68,7 +72,10 @@ def application_executable(app_id):
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology']
+    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology', 'cnt2d']
+    cnt_parameters: dict[str, float | int | str] | None = None
+    cnt_corners: str = Field(default='', max_length=32768)
+    cnt_seed: int = Field(default=20260901, ge=0, le=2147483647)
     document_name: str = Field(default='', max_length=128)
     language: Literal['en', 'ch'] = 'ch'
     enable_formula: bool = True
@@ -78,7 +85,7 @@ class JobRequest(BaseModel):
     input_kind: Literal['smiles', 'name'] = 'smiles'
     compound_name: str = Field(default='', max_length=256)
     title: str = Field(default='', max_length=80)
-    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde', 'textify', 'classification'] = 'energy'
+    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde', 'textify', 'classification', 'conduction'] = 'energy'
     method: str = ''
     basis: str = ''
     charge: int = Field(default=0, ge=-10, le=10)
@@ -141,6 +148,10 @@ def prepare_input(request):
     basis = request.basis or (config['bases'][0] if config['bases'] else '')
     if method not in config['methods'] or (basis and basis not in config['bases']):
         raise ValueError('invalid_method')
+    if request.app_id == 'cnt2d':
+        request.method = method
+        validate_cnt2d(request)
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
     if request.app_id == 'mineru':
         if request.task != 'textify' or request.xyz or request.smiles or not request.document_name:
             raise ValueError('invalid_document')
@@ -354,7 +365,7 @@ class Manager:
             text = log_path.read_text(errors='replace')
             markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE',
                        'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE', 'mineru': 'EM_AGENT_MINERU_COMPLETE',
-                       'crystal-morphology': 'EM_AGENT_MORPHOLOGY_COMPLETE'}
+                       'crystal-morphology': 'EM_AGENT_MORPHOLOGY_COMPLETE', 'cnt2d': 'EM_AGENT_CNT2D_COMPLETE'}
             if job['status'] != 'cancelled':
                 success = job['exit_code'] == 0 and markers[job['app_id']].lower() in text.lower() and not job['error']
                 if success and job['app_id'] == 'magus':
@@ -382,6 +393,11 @@ class Manager:
                 if success and job['app_id'] == 'crystal-morphology':
                     result = json.loads((directory / 'result.json').read_text())
                     success = verified_morphology(result, request)
+                    if success:
+                        job['result'] = result
+                if success and job['app_id'] == 'cnt2d':
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = verified_cnt2d(result, request) and (directory / 'results.zip').is_file()
                     if success:
                         job['result'] = result
                 job['status'] = 'succeeded' if success else 'failed'

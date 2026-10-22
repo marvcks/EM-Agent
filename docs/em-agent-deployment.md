@@ -1,5 +1,23 @@
 # 从 fork 的指定提交部署 EM-Agent
 
+## CNT 二维导热运行时
+
+镜像标签 `io.em-agent.cnt2d=1` 独立要求 `/opt/em-agent-tools/cnt2d` 的venv和manifest，
+并添加该目录及共享Python的只读挂载。应用镜像带锁定提交的求解源码、适配器、
+`em-cnt2d`和使用技能，不包含大型环境。最终镜像安装Gmsh所需libGLU，记录系统包清单。
+
+```sh
+UV_BIN=/root/.local/bin/uv bash scripts/em-agent/install-cnt2d-runtime.sh
+```
+
+安装器用 `tools/science_apps/runtime/cnt2d/{pyproject.toml,uv.lock}` 和共享Python 3.11.15
+重建隔离依赖，检查真实import及依赖一致性，再写锁文件哈希manifest。
+部署前比较manifest与候选镜像内锁文件，防止误挂不匹配的环境。
+启动时仅在无同名用户技能时链接cnt2d，保留现有MCP、用户技能和禁用偏好。
+原下载源过慢时可设置 `CNT2D_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple`；
+安装器从冻结锁文件导出全部固定版本和哈希，用 `uv pip sync --require-hashes`
+切换下载来源，不改变包版本或取消完整性校验。
+
 分析环境与 Claude Code ACP 用户技能接入见
 [持久化分析运行时](em-agent-analysis-runtime.md)。带 `io.em-agent.analysis=1`
 的镜像发布前须安装对应锁文件的分析环境；部署器保留 Claude 状态并检查运行时散列。

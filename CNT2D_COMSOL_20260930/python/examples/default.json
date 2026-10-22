@@ -1,0 +1,19 @@
+{
+  "box_size": 100.0,
+  "cnt_length": 10.0,
+  "cnt_width": 1.0,
+  "surface_width": 0.1,
+  "filler_area_fraction_target": 0.01,
+  "angle_min": -90.0,
+  "angle_max": 90.0,
+  "length_unit": "mm",
+  "cnt_k": 400.0,
+  "pvdf_k": 0.146,
+  "surface_k": 7.642,
+  "t_left": 308.0,
+  "t_right": 288.0,
+  "bulk_size": 5.0,
+  "interface_layers": 2,
+  "temperature_order": 2,
+  "mesh_threads": 1
+}

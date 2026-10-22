@@ -27,7 +27,17 @@ RUN mkdir -p /opt/em-agent \
  && dpkg-query -W > /opt/em-agent/pdf-runtime-packages.tsv \
  && rm -rf /var/lib/apt/lists/* /tmp/em-agent-pdf.sources
 
-FROM pdf-runtime AS final
+FROM pdf-runtime AS cnt2d-runtime
+USER root
+RUN sed -e 's|http://snapshot.debian.org/archive/debian/[0-9TZ]*/|https://mirrors.tuna.tsinghua.edu.cn/debian/|' \
+        -e 's|http://snapshot.debian.org/archive/debian-security/[0-9TZ]*/|https://mirrors.tuna.tsinghua.edu.cn/debian-security/|' \
+        /etc/apt/sources.list.d/debian.sources > /tmp/em-agent-cnt2d.sources \
+ && apt-get -o Dir::Etc::sourcelist=/tmp/em-agent-cnt2d.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=2 update \
+ && apt-get -o Dir::Etc::sourcelist=/tmp/em-agent-cnt2d.sources -o Dir::Etc::sourceparts=- install -y --no-install-recommends --no-upgrade libglu1-mesa \
+ && dpkg-query -W > /opt/em-agent/cnt2d-runtime-packages.tsv \
+ && rm -rf /var/lib/apt/lists/* /tmp/em-agent-cnt2d.sources
+
+FROM cnt2d-runtime AS final
 ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.title="EM-Agent"
 LABEL org.opencontainers.image.source="https://github.com/marvcks/EM-Agent"
@@ -38,6 +48,7 @@ LABEL io.em-agent.reactions="1"
 LABEL io.em-agent.bde="1"
 LABEL io.em-agent.crystal-morphology="1"
 LABEL io.em-agent.analysis="1"
+LABEL io.em-agent.cnt2d="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${SOURCE_COMMIT}
 USER root
@@ -55,6 +66,7 @@ RUN mv /usr/local/bin/claude-agent-acp /usr/local/bin/claude-agent-acp.upstream 
  && printf '\n. /opt/agent-canvas/em_agent_runtime/task-shell.sh\n' >> /etc/bash.bashrc
 RUN chmod 755 /opt/agent-canvas/entrypoint.sh
 COPY tools/science_apps/ /opt/agent-canvas/science_apps/
+COPY CNT2D_COMSOL_20260930/python/cnt2d/ /opt/agent-canvas/science_apps/cnt2d/
 RUN install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magus-mace \
  && install -m 755 /opt/agent-canvas/science_apps/em-magus /usr/local/bin/em-magus \
  && install -m 755 /opt/agent-canvas/science_apps/aizynth-route /usr/local/bin/aizynth-route \
@@ -65,5 +77,7 @@ RUN install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magu
  && install -m 755 /opt/agent-canvas/science_apps/mineru-parse /usr/local/bin/mineru-parse \
  && install -m 755 /opt/agent-canvas/science_apps/em-mineru /usr/local/bin/em-mineru \
  && install -m 755 /opt/agent-canvas/science_apps/morphology-classify /usr/local/bin/morphology-classify \
- && install -m 755 /opt/agent-canvas/science_apps/em-morphology /usr/local/bin/em-morphology
+ && install -m 755 /opt/agent-canvas/science_apps/em-morphology /usr/local/bin/em-morphology \
+ && install -m 755 /opt/agent-canvas/science_apps/cnt2d-solve /usr/local/bin/cnt2d-solve \
+ && install -m 755 /opt/agent-canvas/science_apps/em-cnt2d /usr/local/bin/em-cnt2d
 USER openhands

@@ -33,8 +33,10 @@ import { BDEForm, BDEResult } from "./bde-form";
 import { ReactionForm } from "./reaction-form";
 import { MinerUForm } from "./mineru-form";
 import { MorphologyForm, MorphologyResult } from "./morphology-form";
+import { CNT2DForm, CNT2DResult } from "./cnt2d-form";
 
 const DESCRIPTION_KEYS = {
+  cnt2d: I18nKey.SCIENCE$CNT_DESCRIPTION,
   mineru: I18nKey.SCIENCE$MINERU_DESCRIPTION,
   bde: I18nKey.SCIENCE$BDE_DESCRIPTION,
   xtb: I18nKey.SCIENCE$XTB_DESCRIPTION,
@@ -53,6 +55,7 @@ const STATUS_KEYS: Record<ScienceJobStatus, I18nKey> = {
   cancelled: I18nKey.SCIENCE$CANCELLED,
 };
 const ERROR_KEYS: Record<string, I18nKey> = {
+  invalid_cnt2d_input: I18nKey.SCIENCE$CNT_ERROR,
   invalid_document: I18nKey.SCIENCE$DOCUMENT_ERROR,
   input_too_large: I18nKey.SCIENCE$DOCUMENT_ERROR,
   invalid_bde_input: I18nKey.SCIENCE$BDE_INPUT_ERROR,
@@ -71,6 +74,7 @@ const ERROR_KEYS: Record<string, I18nKey> = {
   invalid_morphology_input: I18nKey.SCIENCE$MORPHOLOGY_INPUT_ERROR,
 };
 const CATEGORY_KEYS = {
+  thermal: I18nKey.SCIENCE$CNT_CATEGORY,
   document: I18nKey.SCIENCE$DOCUMENT_CATEGORY,
   bond: I18nKey.SCIENCE$BDE_CATEGORY,
   all: I18nKey.SCIENCE$ALL,
@@ -81,6 +85,7 @@ const CATEGORY_KEYS = {
 };
 const SCIENCE_CATEGORIES = [
   "all",
+  "thermal",
   "document",
   "bond",
   "quantum",
@@ -251,6 +256,13 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                   onCreated={onSelectJob}
                   renderError={(error) => <ErrorMessage error={error} />}
                 />
+              ) : selected.id === "cnt2d" ? (
+                <CNT2DForm
+                  key={selected.id}
+                  app={selected}
+                  onCreated={onSelectJob}
+                  renderError={(error) => <ErrorMessage error={error} />}
+                />
               ) : selected.id === "crystal-morphology" ? (
                 <MorphologyForm
                   app={selected}
@@ -360,11 +372,13 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                       {t(
                         app.category === "document"
                           ? I18nKey.SCIENCE$DOCUMENT_UPLOAD
-                          : app.id === "crystal-morphology"
-                            ? I18nKey.SCIENCE$MORPHOLOGY_TABLE_INPUT
-                            : app.category === "reaction"
-                              ? I18nKey.SCIENCE$SMILES_INPUT
-                              : I18nKey.SCIENCE$XYZ_INPUT,
+                          : app.id === "cnt2d"
+                            ? I18nKey.SCIENCE$CNT_PARAMETERS
+                            : app.id === "crystal-morphology"
+                              ? I18nKey.SCIENCE$MORPHOLOGY_TABLE_INPUT
+                              : app.category === "reaction"
+                                ? I18nKey.SCIENCE$SMILES_INPUT
+                                : I18nKey.SCIENCE$XYZ_INPUT,
                       )}
                     </span>
                   </div>
@@ -864,6 +878,9 @@ function JobResult({ jobId }: { jobId: string | null }) {
           {job.app_id === "bde" && job.status === "succeeded" && job.result && (
             <BDEResult result={job.result} />
           )}
+          {job.app_id === "cnt2d" &&
+            job.status === "succeeded" &&
+            job.result && <CNT2DResult result={job.result} />}
           {job.app_id === "crystal-morphology" &&
             job.status === "succeeded" &&
             job.result && <MorphologyResult result={job.result} />}

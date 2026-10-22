@@ -1,5 +1,33 @@
 # EM-Agent 科学应用
 
+## CNT 二维导热
+
+入口：**科学应用 → 传热仿真 → CNT 二维导热**（`/canvas/science-apps/cnt2d`）。
+填写二维正方形RVE、CNT外尺寸、实体界面厚度、填料面积分数、取向、三相标量
+热导率、左右温度和网格参数；默认1%/10根。可选上传MATLAB制表符 `Corners.txt`，
+坐标使用所选m/cm/mm/um/nm单位，不使用XYZ。Gmsh/scikit-fem/SciPy二阶FEM
+求解稳态导热，左右恒温、上下绝热，输出X方向有效热导率。
+
+最多64根、50万三角形；面积分数0–0.1，基体网格尺寸为RVE边长1–25%，
+界面厚度/分辨率不小于边长0.025%，分辨率1–3；申请内存低于4096MB时最多20万三角形。
+沿用串行队列、8核/8192MB申请、手动15分钟和Agent自主监控/取消规则。
+成功需完成标记和科学校验，不将热导率放入能量字段。
+`results.zip`包含实际参数、角点、PNG、MSH、VTU、完整P2解NPZ和诊断JSON/CSV。
+反力守恒小不代表网格收敛；已对照一个5%/50根CNT的COMSOL算例，其他工况仍需检查。
+
+新对话加载 `cnt2d` 技能，通过同一科学服务执行：
+
+```sh
+em-cnt2d submit --seed 20260901 --cores 2 --memory-mb 4096
+em-cnt2d submit --parameters parameters.json --corners Corners.txt
+em-cnt2d status JOB_ID
+em-cnt2d cancel JOB_ID
+em-cnt2d download JOB_ID ./cnt-results
+```
+
+独立CLI源码、数值测试和参数说明在 `CNT2D_COMSOL_20260930/python/`。
+服务适配器开放单结构稳态计算，不开放独立CLI的多样本网格扫描任务。
+
 入口：侧栏 **科学应用** → xTB / ORCA / Gaussian / MAGUS。用户上传或粘贴标准 XYZ，配置参数，提交后查看状态、日志并下载输入与输出。手动页面与 Agent 对话独立，不产生模型调用。
 
 ## Agent 任务时长与对话附件

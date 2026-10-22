@@ -26,6 +26,17 @@ vi.mock("#/api/science-apps-service", async (importOriginal) => ({
 }));
 const applications: ScienceApplication[] = [
   {
+    id: "cnt2d",
+    name: "CNT 二维导热",
+    category: "thermal",
+    available: true,
+    methods: ["FEM-P2"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  },
+  {
     id: "mineru",
     name: "MinerU",
     category: "document",
@@ -156,6 +167,71 @@ beforeEach(() => {
 });
 
 describe("manual scientific applications", () => {
+  // @spec CNT2D-005 — Non-molecular parameters submit through the shared science API.
+  it("submits CNT geometry and material parameters without molecular fields", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ScienceAppsPage appId="cnt2d" jobId={null} onSelectJob={vi.fn()} />,
+    );
+    await screen.findByTestId("science-submit");
+    expect(
+      screen.queryByLabelText("SCIENCE$UPLOAD_XYZ"),
+    ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("SCIENCE$CNT_FRACTION"), {
+      target: { value: "0.05" },
+    });
+    await user.click(screen.getByTestId("science-submit"));
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          app_id: "cnt2d",
+          task: "conduction",
+          method: "FEM-P2",
+          cnt_seed: 20260901,
+          cnt_parameters: expect.objectContaining({
+            filler_area_fraction_target: 0.05,
+            cnt_k: 400,
+            surface_width: 0.1,
+            length_unit: "mm",
+          }),
+          xyz: "",
+        }),
+        expect.anything(),
+      ),
+    );
+  });
+
+  // @spec CNT2D-006 — Render conductivity with its physical unit and retained download actions.
+  it("renders a solved conductivity result and downloads its bundle", async () => {
+    const user = userEvent.setup();
+    vi.mocked(scienceAppsService.job).mockResolvedValue({
+      ...job,
+      app_id: "cnt2d",
+      status: "succeeded",
+      result: {
+        unit: "W/(m K)",
+        metrics: {
+          Keff_X: 0.193,
+          CNT_Number: 50,
+          Triangles: 400000,
+          Energy_Balance_Error: 1e-8,
+          Gradient_Flux_Balance_Error: 0.001,
+          Filler_Area_Fraction_Mesh: 0.05,
+        },
+      },
+      files: [{ name: "results.zip", size: 1000 }],
+    });
+    renderWithProviders(
+      <ScienceAppsPage appId="cnt2d" jobId="abc" onSelectJob={vi.fn()} />,
+    );
+    expect(await screen.findByText(/0.19300000/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /results.zip/ }));
+    expect(scienceAppsService.download).toHaveBeenCalledWith(
+      "abc",
+      "results.zip",
+    );
+  });
+
   // @spec MINERU-004 — Upload documents with parser options and no molecular fields
   it("submits a Word file to MinerU and clears a previous selection after invalid input", async () => {
     const user = userEvent.setup({ applyAccept: false });

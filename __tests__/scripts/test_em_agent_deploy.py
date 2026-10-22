@@ -31,6 +31,15 @@ services:
 
 
 class DeploymentTests(unittest.TestCase):
+    # @spec CNT2D-007 — Independent, read-only conduction runtime; rollback keeps old mounts.
+    def test_cnt2d_mount_is_independent_and_idempotent(self):
+        result = deploy.render_compose(COMPOSE, NEW_IMAGE, cnt2d_tools=True)
+        self.assertIn('/opt/em-agent-tools/cnt2d:/opt/em-agent-tools/cnt2d:ro', result)
+        self.assertIn('/opt/em-agent-tools/python:/opt/em-agent-tools/python:ro', result)
+        self.assertNotIn('/opt/em-agent-tools/magus', result)
+        self.assertEqual(deploy.render_compose(result, NEW_IMAGE, cnt2d_tools=True), result)
+        self.assertNotIn('/opt/em-agent-tools/cnt2d', deploy.render_compose(COMPOSE, OLD_IMAGE))
+
     # @spec AR-004 — Analysis runtime and Claude sessions survive recreation
     def test_analysis_runtime_has_independent_readonly_mount_and_persistent_claude_state(self):
         result = deploy.render_compose(COMPOSE, NEW_IMAGE, analysis_tools=True)

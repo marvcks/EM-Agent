@@ -73,6 +73,7 @@ class ScienceTests(unittest.TestCase):
             (root / 'molecules.smi').write_text('CCO')
             (root / 'paper.pdf').write_bytes(b'%PDF-1.4\nExample')
             cases = [
+                ('em-cnt2d', []),
                 ('em-bde', ['--smiles', 'CCO']),
                 ('em-magus', [str(root / 'water.xyz'), '--volume-min', '180', '--volume-max', '400']),
                 ('em-reaction', ['lcms2yield', str(root / 'molecules.smi')]),
@@ -90,6 +91,39 @@ class ScienceTests(unittest.TestCase):
                     self.assertEqual(request.get_method(), 'POST')
                     self.assertEqual(request.get_header('X-em-agent-source'), 'agent')
                     self.assertEqual(request.get_header('X-session-api-key'), 'test-key')
+
+    # @spec CNT2D-006 — Shared queue stores only a verified conduction result.
+    def test_cnt2d_result_verification_and_nonmolecular_request(self):
+        from tools.science_apps.cnt2d_runner import validate_cnt2d
+        request = JobRequest(app_id='cnt2d', task='conduction', method='FEM-P2')
+        name, content, args = prepare_input(request)
+        self.assertEqual((name, args), ('request.json', ['request.json']))
+        self.assertEqual(__import__('json').loads(content)['cnt_seed'], 20260901)
+        with self.assertRaises(ValueError):
+            prepare_input(request.model_copy(update={'xyz': WATER}))
+        result = {'verified': True, 'app_id': 'cnt2d', 'unit': 'W/(m K)',
+                  'parameters': validate_cnt2d(request), 'seed': 20260901,
+                  'metrics': {'Keff_X': .15, 'CNT_Number': 10, 'Triangles': 1000,
+                              'Energy_Balance_Error': 1e-9, 'Free_Residual_Relative': 1e-10,
+                              'Heatflow_Left': -3., 'Heatflow_Right': 3.,
+                              'Matrix_Area_Fraction_Mesh': .99, 'Core_Area_Fraction_Mesh': .00784,
+                              'Interface_Area_Fraction_Mesh': .00216}}
+        async def exercise(root):
+            executable = root / 'cnt-solver'
+            manager = Manager(root / 'jobs')
+            with patch('tools.science_apps.service.application_executable', return_value=str(executable)):
+                for valid in [False, True]:
+                    payload = result if valid else {**result, 'unit': 'eV'}
+                    executable.write_text('#!/bin/sh\necho \'%s\' > result.json\ntouch results.zip\necho EM_AGENT_CNT2D_COMPLETE\n' % __import__('json').dumps(payload))
+                    executable.chmod(0o755)
+                    job = manager.submit(request)
+                    await manager.run(job['id'])
+                    detail = manager.detail(job['id'])
+                    self.assertEqual(detail['status'], 'succeeded' if valid else 'failed')
+                    self.assertEqual(detail.get('result'), result if valid else None)
+                    self.assertIsNone(detail['energy_hartree'])
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
 
     # @spec CM-003 — Only a verified morphology result publishes predictions
     def test_morphology_publishes_only_complete_verified_result(self):

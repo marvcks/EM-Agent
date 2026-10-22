@@ -1,0 +1,3 @@
+#!/bin/sh
+exec /opt/em-agent-tools/cnt2d/.venv/bin/python -I \
+  /opt/agent-canvas/science_apps/cnt2d_runner.py "$@"
