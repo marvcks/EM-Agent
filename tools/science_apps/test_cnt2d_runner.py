@@ -53,3 +53,16 @@ class CNT2DTests(unittest.TestCase):
                       {'metrics': {**result['metrics'], 'Keff_X': float('nan')}},
                       {'metrics': {**result['metrics'], 'CNT_Number': 500}}]:
             self.assertFalse(verified_cnt2d({**result, **patch}, r))
+
+    def test_pure_matrix_accepts_integration_roundoff_but_not_invalid_area(self):
+        r = request(parameters={'filler_area_fraction_target': 0.0})
+        result = {'verified': True, 'app_id': 'cnt2d', 'unit': 'W/(m K)',
+                  'parameters': validate_cnt2d(r), 'seed': r.cnt_seed,
+                  'metrics': {'Keff_X': .146, 'CNT_Number': 0, 'Triangles': 100,
+                              'Energy_Balance_Error': 1e-12, 'Free_Residual_Relative': 1e-12,
+                              'Heatflow_Left': -2.92, 'Heatflow_Right': 2.92,
+                              'Matrix_Area_Fraction_Mesh': 1.000000000000002,
+                              'Core_Area_Fraction_Mesh': 0., 'Interface_Area_Fraction_Mesh': 0.}}
+        self.assertTrue(verified_cnt2d(result, r))
+        result['metrics']['Matrix_Area_Fraction_Mesh'] = 1.01
+        self.assertFalse(verified_cnt2d(result, r))

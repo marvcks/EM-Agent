@@ -132,7 +132,8 @@ def verified_cnt2d(result, request):
                 and 0 <= m['Free_Residual_Relative'] < 1e-8
                 and m['Heatflow_Left'] * (p['t_left'] - p['t_right']) < 0
                 and m['Heatflow_Right'] * (p['t_left'] - p['t_right']) > 0
-                and all(0 <= m[k] <= 1 for k in numeric[-3:])
+                # Normalized quadrature can sum to 1 + a few ulps for pure matrix.
+                and all(-1e-10 <= m[k] <= 1 + 1e-10 for k in numeric[-3:])
                 and math.isclose(m['Keff_X'], (abs(m['Heatflow_Left']) + abs(m['Heatflow_Right'])) /
                                  (2 * abs(p['t_left'] - p['t_right'])), rel_tol=1e-7)
                 and abs(sum(m[k] for k in numeric[-3:]) - 1) < 1e-8)
