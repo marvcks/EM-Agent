@@ -32,6 +32,7 @@ MORPHOLOGY_MOUNTS = {'/opt/em-agent-tools/crystal-morphology': '/opt/em-agent-to
 ANALYSIS_MOUNTS = {f'/opt/em-agent-tools/{name}': f'/opt/em-agent-tools/{name}' for name in ('python', 'analysis')}
 CNT2D_MOUNTS = {'/opt/em-agent-tools/cnt2d': '/opt/em-agent-tools/cnt2d',
                 '/opt/em-agent-tools/python': '/opt/em-agent-tools/python'}
+EDITRETRO_MOUNTS = {f'/opt/em-agent-tools/{name}': f'/opt/em-agent-tools/{name}' for name in ('python', 'editretro')}
 PROBE = '''
 import json, os, urllib.request, urllib.parse
 headers = {'X-Session-API-Key': os.environ['LOCAL_BACKEND_API_KEY']}
@@ -73,7 +74,7 @@ def run(*args, input=None):
     return result.stdout
 
 
-def render_compose(original, image_id, remove_frontend=True, science_tools=False, reaction_tools=False, bde_tools=False, morphology_tools=False, analysis_tools=False, cnt2d_tools=False):
+def render_compose(original, image_id, remove_frontend=True, science_tools=False, reaction_tools=False, bde_tools=False, morphology_tools=False, analysis_tools=False, cnt2d_tools=False, editretro_tools=False):
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id):
         raise ValueError('Expected an immutable local image ID')
     if len(re.findall(r'^    image:.*$', original, flags=re.M)) != 1:
@@ -90,7 +91,7 @@ def render_compose(original, image_id, remove_frontend=True, science_tools=False
             if destination in result:
                 raise ValueError(f'Another mount owns {destination}')
             additions.append(line)
-    tool_mounts = {**(SCIENCE_MOUNTS if science_tools else {}), **(REACTION_MOUNTS if reaction_tools else {}), **(BDE_MOUNTS if bde_tools else {}), **(MORPHOLOGY_MOUNTS if morphology_tools else {}), **(ANALYSIS_MOUNTS if analysis_tools else {}), **(CNT2D_MOUNTS if cnt2d_tools else {})}
+    tool_mounts = {**(SCIENCE_MOUNTS if science_tools else {}), **(REACTION_MOUNTS if reaction_tools else {}), **(BDE_MOUNTS if bde_tools else {}), **(MORPHOLOGY_MOUNTS if morphology_tools else {}), **(ANALYSIS_MOUNTS if analysis_tools else {}), **(CNT2D_MOUNTS if cnt2d_tools else {}), **(EDITRETRO_MOUNTS if editretro_tools else {})}
     if tool_mounts:
         for source, destination in tool_mounts.items():
             line = f'      - {source}:{destination}:ro\n'
@@ -226,7 +227,20 @@ def deploy(root, image, commit):
         expected_lock = run('docker', 'run', '--rm', '--entrypoint', 'cat', info['Id'], '/opt/agent-canvas/science_apps/runtime/cnt2d/uv.lock')
         if manifest.get('lock_sha256') != hashlib.sha256(expected_lock.encode()).hexdigest():
             raise RuntimeError('CNT2D runtime lock does not match the candidate image')
-    candidate = render_compose(original, info['Id'], science_tools=science_tools, reaction_tools=reaction_tools, bde_tools=bde_tools, morphology_tools=morphology_tools, analysis_tools=analysis_tools, cnt2d_tools=cnt2d_tools)
+    # @spec ER-004 — Frozen CPU runtime and checkpoint are mounted independently.
+    editretro_tools = labels.get('io.em-agent.editretro') == '1'
+    if editretro_tools:
+        runtime = Path('/opt/em-agent-tools/editretro')
+        required = [runtime / name for name in ('.venv/bin/python', '.venv/bin/fairseq-interactive',
+                    'manifest.json', 'checkpoint_best.pt', 'source/interactive/databin/dict.src.txt',
+                    'source/interactive/databin/dict.tgt.txt', 'source/preprocess/SPE_ChEMBL.txt')]
+        if not all(path.is_file() and path.stat().st_size > 0 for path in required):
+            raise RuntimeError('Prepare the isolated EditRetro CPU runtime and user checkpoint before deploying')
+        manifest = json.loads((runtime / 'manifest.json').read_text())
+        expected_lock = run('docker', 'run', '--rm', '--entrypoint', 'cat', info['Id'], '/opt/agent-canvas/science_apps/runtime/editretro/uv.lock')
+        if manifest.get('lock_sha256') != hashlib.sha256(expected_lock.encode()).hexdigest():
+            raise RuntimeError('EditRetro runtime lock does not match the candidate image')
+    candidate = render_compose(original, info['Id'], science_tools=science_tools, reaction_tools=reaction_tools, bde_tools=bde_tools, morphology_tools=morphology_tools, analysis_tools=analysis_tools, cnt2d_tools=cnt2d_tools, editretro_tools=editretro_tools)
     fallback = render_compose(original, previous['Image'], remove_frontend=False)
     atomic_write(release / 'compose-candidate.yaml', candidate)
     atomic_write(release / 'compose-rollback.yaml', fallback)

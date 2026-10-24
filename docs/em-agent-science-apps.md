@@ -1,5 +1,41 @@
 # EM-Agent 科学应用
 
+## EditRetro 单步逆合成
+
+入口：**科学应用 → 反应模型 → EditRetro**（`/canvas/science-apps/editretro`）。输入一个
+连通产物的 SMILES（含氢最多 128 原子），可粘贴或上传 `.smi` / `.txt`；示例来自
+用户提供的“输入输出示例及Github地址.docx”。返回候选数与输入增强次数均为 1–20。
+默认 4 核、4096 MB、20 次增强、最多 20 个候选。固定使用 2D 模型、10 次编辑迭代、
+5×4 编辑 beam、seed 1；允许返回少于请求数量的有效候选。
+
+使用用户的 `checkpoint_best.pt`，SHA-256 为
+`3a537dc6a8992dd61c02993485d8f89c83a7169e63ccb956dab88b949327daf8`，
+与上游 `8e5848e899b4e8ec6be970b9be04881042ed7b55` 严格加载匹配（260 项参数、
+词表 3136 项、无缺失/额外参数，`use_3d_features=false`）。CPU 适配将 4 处设备传输改成
+`.to(device)`；隔离的 Torch 1.12 CPU 库清除 GNU_STACK 可执行标记以兼容容器 glibc，
+修改前脱离 uv 共享缓存的硬链接，不修改模型张量或库指令。
+
+文档分子在宿主机 8 核下约 16 秒、峰值内存约 1.62 GiB；容器实际用户、只读挂载、
+4 核运行约 27 秒，返回 20 个有效候选。前两名与文档一致，前 20 个候选有 5 个相同，
+未完整复现文档排序。这是示例兼容性验收，不是论文准确率复现。
+
+结果显示排序与反应物 SMILES，`.` 分隔同一候选中的不同反应物。可下载 `result.json`、
+`candidates.csv`、`ranked_preds.txt`、原始 `generation.txt` 和 `results.zip`。
+候选为单步模型预测；排序不代表校准概率或实验可行性，不评估多步路线或原料库可得性。
+运行前校验权重、源码、词表、分词文件和 CPU 库散列，不触发联网下载或训练。
+
+Agent 新对话加载 `editretro` 使用技能，经同一 `/api/science` 队列提交：
+
+```sh
+em-reaction submit editretro product.smi --top-k 20 --augmentations 20 --cores 4 --memory-mb 4096
+em-reaction status JOB_ID
+em-reaction cancel JOB_ID
+em-reaction download JOB_ID ./editretro-results
+```
+
+沿用串行队列、最多 10 项未结束任务、8 核/8192 MB 申请、停止及历史下载。
+手动任务限 900 秒，Agent 提交由 Agent 监控和决定取消。内存申请不是操作系统硬隔离。
+
 ## CNT 二维导热
 
 入口：**科学应用 → 传热仿真 → CNT 二维导热**（`/canvas/science-apps/cnt2d`）。

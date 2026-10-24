@@ -26,6 +26,17 @@ vi.mock("#/api/science-apps-service", async (importOriginal) => ({
 }));
 const applications: ScienceApplication[] = [
   {
+    id: "editretro",
+    name: "EditRetro",
+    category: "reaction",
+    available: true,
+    methods: ["2D"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  },
+  {
     id: "cnt2d",
     name: "CNT 二维导热",
     category: "thermal",
@@ -327,6 +338,57 @@ describe("manual scientific applications", () => {
     );
     expect(screen.getByRole("table")).toHaveTextContent("119.50");
     expect(screen.getByText("SCIENCE$BDE_MINIMUM")).toBeInTheDocument();
+  });
+
+  // @spec ER-003 — Product form submits prediction controls and displays ranked precursors.
+  it("submits EditRetro prediction parameters and shows single-step candidates", async () => {
+    const user = userEvent.setup();
+    vi.mocked(scienceAppsService.job).mockResolvedValue({
+      ...job,
+      app_id: "editretro",
+      status: "succeeded",
+      result: {
+        prediction_count: 1,
+        candidates: [
+          { rank: 1, smiles: "CCN.CC(=O)O", reactants: ["CCN", "CC(=O)O"] },
+        ],
+      },
+    });
+    renderWithProviders(
+      <ScienceAppsPage appId="editretro" jobId="abc" onSelectJob={vi.fn()} />,
+    );
+    await screen.findByTestId("science-submit");
+    expect(
+      screen.queryByLabelText("SCIENCE$SEARCH_DEPTH"),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "SCIENCE$SMILES_EXAMPLE" }),
+    );
+    fireEvent.change(screen.getByLabelText("SCIENCE$EDITRETRO_TOP_K"), {
+      target: { value: "10" },
+    });
+    fireEvent.change(screen.getByLabelText("SCIENCE$EDITRETRO_AUGMENTATIONS"), {
+      target: { value: "5" },
+    });
+    await user.click(screen.getByTestId("science-submit"));
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          app_id: "editretro",
+          task: "retrosynthesis",
+          method: "2D",
+          xyz: "",
+          smiles: expect.stringContaining("Nc2ncc"),
+          top_k: 10,
+          augmentations: 5,
+        }),
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByRole("table")).toHaveTextContent("CCN.CC(=O)O");
+    expect(
+      screen.getByText("SCIENCE$EDITRETRO_RESULT_NOTE"),
+    ).toBeInTheDocument();
   });
 
   it.each(["aizynthfinder", "lcms2yield"] as const)(

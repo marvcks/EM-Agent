@@ -36,6 +36,7 @@ import { MorphologyForm, MorphologyResult } from "./morphology-form";
 import { CNT2DForm, CNT2DResult } from "./cnt2d-form";
 
 const DESCRIPTION_KEYS = {
+  editretro: I18nKey.SCIENCE$EDITRETRO_DESCRIPTION,
   cnt2d: I18nKey.SCIENCE$CNT_DESCRIPTION,
   mineru: I18nKey.SCIENCE$MINERU_DESCRIPTION,
   bde: I18nKey.SCIENCE$BDE_DESCRIPTION,
@@ -875,6 +876,39 @@ function JobResult({ jobId }: { jobId: string | null }) {
               </p>
             </>
           )}
+          {/* @spec ER-003 — Ranked single-step predictions remain distinct from route search. */}
+          {job.app_id === "editretro" &&
+            job.status === "succeeded" &&
+            job.result?.candidates && (
+              <>
+                <h3>
+                  {t(I18nKey.SCIENCE$EDITRETRO_COUNTS, {
+                    count: job.result.prediction_count,
+                  })}
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr>
+                        <th>{t(I18nKey.SCIENCE$EDITRETRO_RANK)}</th>
+                        <th>{t(I18nKey.SCIENCE$EDITRETRO_CANDIDATE)}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {job.result.candidates.map((row) => (
+                        <tr key={row.rank}>
+                          <td className="align-top p-2">{row.rank}</td>
+                          <td className="break-all p-2">{row.smiles}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="em-science-help">
+                  {t(I18nKey.SCIENCE$EDITRETRO_RESULT_NOTE)}
+                </p>
+              </>
+            )}
           {job.app_id === "bde" && job.status === "succeeded" && job.result && (
             <BDEResult result={job.result} />
           )}

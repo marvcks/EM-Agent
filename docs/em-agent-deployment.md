@@ -1,5 +1,27 @@
 # 从 fork 的指定提交部署 EM-Agent
 
+## EditRetro CPU 运行时
+
+Python 3.10.19、Torch 1.12.0+cpu 与项目旧 fairseq 0.9.0 使用独立环境，
+最终路径为 `/opt/em-agent-tools/editretro`。先将用户提供的权重放入该目录的
+`checkpoint_best.pt`，并在共享解释器目录安装 Python 3.10.19：
+
+```sh
+UV_PYTHON_INSTALL_DIR=/opt/em-agent-tools/python /root/.local/bin/uv python install 3.10.19
+UV_BIN=/root/.local/bin/uv bash scripts/em-agent/install-editretro-runtime.sh
+```
+
+安装器固定上游提交，按 `tools/science_apps/runtime/editretro/{pyproject.toml,uv.lock}`
+建立环境，编译 CPU fairseq 扩展，应用 4 处设备兼容补丁和 Torch ELF 栈标记补丁。
+ELF 修改使用私有 inode，不改变 uv 共享缓存。严格匹配全部权重后生成带散列的 manifest。
+模型、完整上游源码和环境不进入应用 Git 或镜像。
+
+镜像标签 `io.em-agent.editretro=1` 要求解释器、控制台入口、manifest、权重、两份词表
+和 SPE 文件存在，且 manifest 的依赖锁散列与候选镜像一致。部署器独立添加
+`/opt/em-agent-tools/editretro` 与共享 Python 的同路径只读挂载，保留原有其他工具和卷。
+容器启动仅在没有同名用户技能时链接自带 `editretro` 技能；CLI 复用 `em-reaction`。
+安装、原生推理与各入口的实际状态见本地 EditRetro 安装及部署报告。
+
 ## CNT 二维导热运行时
 
 镜像标签 `io.em-agent.cnt2d=1` 独立要求 `/opt/em-agent-tools/cnt2d` 的venv和manifest，

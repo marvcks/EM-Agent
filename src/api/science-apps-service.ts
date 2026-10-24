@@ -10,6 +10,7 @@ export const SCIENCE_EXAMPLE_XYZ =
 export const SCIENCE_MAGUS_EXAMPLE_XYZ =
   "5\nMethane\nC 0 0 0\nH 0.63 0.63 0.63\nH -0.63 -0.63 0.63\nH -0.63 0.63 -0.63\nH 0.63 -0.63 -0.63\n";
 export const SCIENCE_APP_IDS = [
+  "editretro",
   "cnt2d",
   "mineru",
   "xtb",
@@ -31,6 +32,8 @@ export const SCIENCE_MORPHOLOGY_FEATURES = [
 export const SCIENCE_MORPHOLOGY_EXAMPLE_CSV =
   "添加剂百分比,反溶剂温度(°C),搅拌速率(rpm),浓度(g/ml),溶剂/反溶剂比值\n1,10,300,0.06,0.125\n5,5,300,0.06,0.167\n";
 export const SCIENCE_ROUTE_EXAMPLE = "CC(=O)Oc1ccccc1C(=O)O";
+export const SCIENCE_EDITRETRO_EXAMPLE =
+  "Cc1csc(Nc2ncc(SC(C)c3ccccn3)cc2Oc2cc(C(=O)NCCN(C)C)ccc2Cl)n1";
 export const SCIENCE_CF_EXAMPLE =
   "CN(N=C1)C=C1CC2(CC(F)(F)C2)NC(CC3=CC(C=C(Br)C=N4)=C4C=C3)C5=C(O)C=CC=N5";
 export type ScienceAppId = (typeof SCIENCE_APP_IDS)[number];
@@ -127,6 +130,8 @@ export interface ScienceJobRequest {
   search_seconds?: number;
   max_transforms?: number;
   max_routes?: number;
+  top_k?: number;
+  augmentations?: number;
 }
 export interface ScienceJob {
   id: string;
@@ -171,6 +176,7 @@ export interface ScienceJob {
     route_count?: number;
     solved_count?: number;
     correction_factors?: { smiles: string; cf: number }[];
+    candidates?: { rank: number; smiles: string; reactants: string[] }[];
     model_id?: string;
     prediction_count?: number;
     class_counts?: Record<string, number>;

@@ -30,6 +30,7 @@ from .bde_runner import bde_available, validate_bde, verified_bde
 from .mineru_runner import MAX_DOCUMENT_BYTES, mineru_available, validate_document, verified_mineru
 from .morphology_runner import morphology_available, validate_morphology, verified_morphology
 from .cnt2d_runner import cnt2d_available, validate_cnt2d, verified_cnt2d
+from .editretro_runner import editretro_available, validate_editretro, verified_editretro
 
 PREFIX = '/api/science'
 MAX_LOG_BYTES = 10 * 1024 * 1024
@@ -37,6 +38,7 @@ TIMEOUT_SECONDS = 900
 ACTIVE = {'queued', 'running'}
 ELEMENTS = ('H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og').split()
 APPLICATIONS = {
+    'editretro': {'name': 'EditRetro', 'executable': 'editretro-predict', 'methods': ['2D'], 'bases': [], 'category': 'reaction'},
     'cnt2d': {'name': 'CNT 二维导热', 'executable': 'cnt2d-solve', 'methods': ['FEM-P2'], 'bases': [], 'category': 'thermal'},
     'mineru': {'name': 'MinerU', 'executable': 'mineru-parse', 'methods': ['vlm', 'pipeline'], 'bases': [], 'category': 'document'},
     'bde': {'name': 'BDE', 'executable': 'bde-analyze', 'methods': ['ALFABET', 'Psi4'], 'bases': [], 'category': 'bond'},
@@ -54,6 +56,8 @@ APPLICATIONS = {
 
 def application_executable(app_id):
     executable = shutil.which(APPLICATIONS[app_id]['executable'])
+    if app_id == 'editretro' and not editretro_available():
+        return None
     if app_id == 'cnt2d' and not cnt2d_available():
         return None
     if app_id == 'mineru' and not mineru_available():
@@ -72,7 +76,9 @@ def application_executable(app_id):
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology', 'cnt2d']
+    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology', 'cnt2d', 'editretro']
+    top_k: int = Field(default=20, ge=1, le=20)
+    augmentations: int = Field(default=20, ge=1, le=20)
     cnt_parameters: dict[str, float | int | str] | None = None
     cnt_corners: str = Field(default='', max_length=32768)
     cnt_seed: int = Field(default=20260901, ge=0, le=2147483647)
@@ -148,6 +154,10 @@ def prepare_input(request):
     basis = request.basis or (config['bases'][0] if config['bases'] else '')
     if method not in config['methods'] or (basis and basis not in config['bases']):
         raise ValueError('invalid_method')
+    if request.app_id == 'editretro':
+        request.method = method
+        validate_editretro(request)
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
     if request.app_id == 'cnt2d':
         request.method = method
         validate_cnt2d(request)
@@ -328,7 +338,7 @@ class Manager:
         # PyTorch multiprocessing uses Unix sockets beneath TMPDIR. Persistent
         # job paths exceed AF_UNIX's path limit, so reaction jobs get a short,
         # private scratch path. The same finally block removes it on stop/failure.
-        if request.app_id in REACTION_APPS:
+        if request.app_id in REACTION_APPS or request.app_id == 'editretro':
             scratch = Path(tempfile.mkdtemp(prefix='em-science-', dir='/tmp'))
         else:
             scratch = directory / 'scratch'
@@ -364,6 +374,7 @@ class Manager:
                 job['exit_code'] = await self.process.wait()
             text = log_path.read_text(errors='replace')
             markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE',
+                       'editretro': 'EM_AGENT_EDITRETRO_COMPLETE',
                        'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE', 'mineru': 'EM_AGENT_MINERU_COMPLETE',
                        'crystal-morphology': 'EM_AGENT_MORPHOLOGY_COMPLETE', 'cnt2d': 'EM_AGENT_CNT2D_COMPLETE'}
             if job['status'] != 'cancelled':
@@ -398,6 +409,11 @@ class Manager:
                 if success and job['app_id'] == 'cnt2d':
                     result = json.loads((directory / 'result.json').read_text())
                     success = verified_cnt2d(result, request) and (directory / 'results.zip').is_file()
+                    if success:
+                        job['result'] = result
+                if success and job['app_id'] == 'editretro':
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = verified_editretro(result, request) and (directory / 'results.zip').is_file()
                     if success:
                         job['result'] = result
                 job['status'] = 'succeeded' if success else 'failed'

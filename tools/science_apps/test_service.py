@@ -15,6 +15,48 @@ WATER = '3\nwater\nO 0 0 0\nH 0.7586 0 0.5043\nH -0.7586 0 0.5043\n'
 
 
 class ScienceTests(unittest.TestCase):
+    # @spec ER-002 — Single-product prediction and verified ranked candidates share the queue.
+    def test_editretro_contract_and_result_gate(self):
+        from tools.science_apps.editretro_runner import verified_editretro
+        request = JobRequest(app_id='editretro', task='retrosynthesis', smiles='CC(=O)NCC',
+                             top_k=2, augmentations=5)
+        name, content, args = prepare_input(request)
+        self.assertEqual((name, args), ('request.json', ['request.json']))
+        self.assertEqual(__import__('json').loads(content)['augmentations'], 5)
+        for change in ({'smiles': 'CCO.CN'}, {'smiles': 'CCO\nCCN'}, {'task': 'search'},
+                       {'xyz': WATER}, {'method': '3D'}, {'charge': 1}, {'compound_name': 'ethanol'}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                prepare_input(request.model_copy(update=change))
+        for change in ({'top_k': 21}, {'augmentations': 0}):
+            with self.assertRaises(ValueError):
+                JobRequest(**{**request.model_dump(), **change})
+        result = {'app_id': 'editretro', 'verified': True, 'device': 'cpu',
+                  'model_sha256': '3a537dc6a8992dd61c02993485d8f89c83a7169e63ccb956dab88b949327daf8',
+                  'input_smiles': request.smiles, 'top_k': 2, 'augmentations': 5,
+                  'prediction_count': 1,
+                  'candidates': [{'rank': 1, 'smiles': 'CCN.CC(=O)O', 'reactants': ['CCN', 'CC(=O)O']}]}
+        self.assertTrue(verified_editretro(result, request))
+        for change in ({'candidates': []}, {'prediction_count': 2}, {'input_smiles': 'CCO'},
+                       {'model_sha256': 'wrong'}, {'augmentations': 20},
+                       {'candidates': [{'rank': 2, 'smiles': 'CCN', 'reactants': ['CCN']}]}):
+            with self.subTest(change=change):
+                self.assertFalse(verified_editretro({**result, **change}, request))
+        async def exercise(root):
+            executable = root / 'editretro-test'
+            executable.touch(mode=0o755)
+            manager = Manager(root / 'jobs')
+            with patch('tools.science_apps.service.application_executable', return_value=str(executable)):
+                for valid in (False, True):
+                    executable.write_text('#!/bin/sh\necho EM_AGENT_EDITRETRO_COMPLETE\n' +
+                        ("echo '%s' > result.json\npython3 -c 'from zipfile import ZipFile; ZipFile(\"results.zip\",\"w\").close()'\n" % __import__('json').dumps(result) if valid else ''))
+                    job = manager.submit(request)
+                    await manager.run(job['id'])
+                    self.assertEqual(job['status'], 'succeeded' if valid else 'failed')
+                self.assertIsNone(job['energy_hartree'])
+                self.assertEqual(job['result']['candidates'][0]['reactants'], ['CCN', 'CC(=O)O'])
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
+
     # @spec SJT-001 — Agent submissions outlive the manual timeout and remain cancellable
     def test_agent_jobs_have_no_platform_timeout(self):
         async def exercise(root):
@@ -77,6 +119,7 @@ class ScienceTests(unittest.TestCase):
                 ('em-bde', ['--smiles', 'CCO']),
                 ('em-magus', [str(root / 'water.xyz'), '--volume-min', '180', '--volume-max', '400']),
                 ('em-reaction', ['lcms2yield', str(root / 'molecules.smi')]),
+                ('em-reaction', ['editretro', str(root / 'molecules.smi'), '--top-k', '10', '--augmentations', '5']),
                 ('em-mineru', [str(root / 'paper.pdf')]),
                 ('em-morphology', ['--additive-percent', '1', '--antisolvent-temp-c', '10',
                                    '--stirring-rpm', '300', '--concentration-g-ml', '0.06',

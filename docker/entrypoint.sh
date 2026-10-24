@@ -299,7 +299,7 @@ if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ]; then
       ln -s /opt/agent-canvas/science_apps/skills/mineru "$OPENHANDS_DIR/skills/mineru"
     fi
   fi
-  for reaction_tool in aizynthfinder lcms2yield bde; do
+  for reaction_tool in aizynthfinder lcms2yield bde editretro; do
     if [ -x "/opt/em-agent-tools/$reaction_tool/.venv/bin/python" ]; then
       mkdir -p "$OPENHANDS_DIR/skills"
       if [ ! -e "$OPENHANDS_DIR/skills/$reaction_tool" ] && [ ! -L "$OPENHANDS_DIR/skills/$reaction_tool" ]; then

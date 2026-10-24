@@ -25,13 +25,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     submit = commands.add_parser('submit', help='Submit connected molecular SMILES, one per line')
-    submit.add_argument('app_id', choices=['aizynthfinder', 'lcms2yield'])
+    submit.add_argument('app_id', choices=['aizynthfinder', 'lcms2yield', 'editretro'])
     submit.add_argument('smiles_file', type=Path)
     submit.add_argument('--title', default='')
     submit.add_argument('--iterations', type=int, default=100)
     submit.add_argument('--search-seconds', type=int, default=60)
     submit.add_argument('--max-transforms', type=int, default=6)
     submit.add_argument('--max-routes', type=int, default=10)
+    submit.add_argument('--top-k', type=int, default=20)
+    submit.add_argument('--augmentations', type=int, default=20)
     submit.add_argument('--cores', type=int, default=2)
     submit.add_argument('--memory-mb', type=int)
     commands.add_parser('apps')
@@ -46,11 +48,14 @@ def main():
         payload = vars(args).copy()
         payload.pop('command')
         if payload['memory_mb'] is None:
-            payload['memory_mb'] = 6144 if args.app_id == 'aizynthfinder' else 2048
+            payload['memory_mb'] = 6144 if args.app_id == 'aizynthfinder' else (4096 if args.app_id == 'editretro' else 2048)
         source = payload.pop('smiles_file')
         if source.stat().st_size > 32768:
             raise ValueError('SMILES input exceeds 32 KiB')
-        payload.update(task='retrosynthesis' if args.app_id == 'aizynthfinder' else 'correction_factor', smiles=source.read_text())
+        if args.app_id != 'editretro':
+            payload.pop('top_k')
+            payload.pop('augmentations')
+        payload.update(task='correction_factor' if args.app_id == 'lcms2yield' else 'retrosynthesis', smiles=source.read_text())
         result = api('/jobs', payload)
     elif args.command in {'apps', 'jobs'}:
         result = api('/' + args.command)

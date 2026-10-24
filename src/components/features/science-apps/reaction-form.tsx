@@ -9,6 +9,7 @@ import {
   scienceAppsService,
   SCIENCE_ROUTE_EXAMPLE,
   SCIENCE_CF_EXAMPLE,
+  SCIENCE_EDITRETRO_EXAMPLE,
   type ScienceApplication,
   type ScienceJobRequest,
 } from "#/api/science-apps-service";
@@ -34,6 +35,15 @@ const ROUTE_FIELDS = [
   },
   { key: "max_routes", label: I18nKey.SCIENCE$MAX_ROUTES, min: 1, max: 25 },
 ] as const;
+const PREDICTION_FIELDS = [
+  { key: "top_k", label: I18nKey.SCIENCE$EDITRETRO_TOP_K, min: 1, max: 20 },
+  {
+    key: "augmentations",
+    label: I18nKey.SCIENCE$EDITRETRO_AUGMENTATIONS,
+    min: 1,
+    max: 20,
+  },
+] as const;
 
 export function ReactionForm({
   app,
@@ -47,18 +57,21 @@ export function ReactionForm({
   const { t } = useTranslation("openhands");
   const client = useQueryClient();
   const isRoute = app.id === "aizynthfinder";
+  const isPrediction = app.id === "editretro";
+  const fields = isRoute ? ROUTE_FIELDS : isPrediction ? PREDICTION_FIELDS : [];
   const [input, setInput] = useState<ScienceJobRequest>({
     app_id: app.id,
     xyz: "",
     smiles: "",
     title: "",
-    task: isRoute ? "retrosynthesis" : "correction_factor",
+    task: isRoute || isPrediction ? "retrosynthesis" : "correction_factor",
     method: app.methods[0],
     basis: "",
     charge: 0,
     multiplicity: 1,
-    cores: 2,
-    memory_mb: isRoute ? 6144 : 2048,
+    cores: isPrediction ? 4 : 2,
+    memory_mb: isRoute ? 6144 : isPrediction ? 4096 : 2048,
+    ...(isPrediction ? { top_k: 20, augmentations: 20 } : {}),
     ...(isRoute
       ? {
           iterations: 100,
@@ -105,7 +118,11 @@ export function ReactionForm({
           onClick={() => {
             patch(
               "smiles",
-              isRoute ? SCIENCE_ROUTE_EXAMPLE : SCIENCE_CF_EXAMPLE,
+              isRoute
+                ? SCIENCE_ROUTE_EXAMPLE
+                : isPrediction
+                  ? SCIENCE_EDITRETRO_EXAMPLE
+                  : SCIENCE_CF_EXAMPLE,
             );
             setFileError(false);
           }}
@@ -158,26 +175,25 @@ export function ReactionForm({
         {t(
           isRoute
             ? I18nKey.SCIENCE$ROUTE_INPUT_HELP
-            : I18nKey.SCIENCE$CF_INPUT_HELP,
+            : isPrediction
+              ? I18nKey.SCIENCE$EDITRETRO_INPUT_HELP
+              : I18nKey.SCIENCE$CF_INPUT_HELP,
         )}
       </p>
       <div className="em-science-fields">
-        {isRoute &&
-          ROUTE_FIELDS.map((field) => (
-            <label key={field.key}>
-              {t(field.label)}
-              <input
-                type="number"
-                required
-                min={field.min}
-                max={field.max}
-                value={input[field.key]}
-                onChange={(event) =>
-                  patch(field.key, Number(event.target.value))
-                }
-              />
-            </label>
-          ))}
+        {fields.map((field) => (
+          <label key={field.key}>
+            {t(field.label)}
+            <input
+              type="number"
+              required
+              min={field.min}
+              max={field.max}
+              value={input[field.key]}
+              onChange={(event) => patch(field.key, Number(event.target.value))}
+            />
+          </label>
+        ))}
         <label>
           {t(I18nKey.SCIENCE$CORES)}
           <input

@@ -31,6 +31,17 @@ services:
 
 
 class DeploymentTests(unittest.TestCase):
+    # @spec ER-004 — EditRetro mounts are independent and preserve rollback state.
+    def test_editretro_mount_is_independent_and_idempotent(self):
+        result = deploy.render_compose(COMPOSE, NEW_IMAGE, editretro_tools=True)
+        self.assertIn('/opt/em-agent-tools/editretro:/opt/em-agent-tools/editretro:ro', result)
+        self.assertIn('/opt/em-agent-tools/python:/opt/em-agent-tools/python:ro', result)
+        self.assertNotIn('/opt/em-agent-tools/aizynthfinder', result)
+        self.assertEqual(deploy.render_compose(result, NEW_IMAGE, editretro_tools=True), result)
+        self.assertNotIn('/opt/em-agent-tools/editretro', deploy.render_compose(COMPOSE, OLD_IMAGE))
+        with self.assertRaises(ValueError):
+            deploy.render_compose(COMPOSE.replace('    volumes:\n', '    volumes:\n      - /other:/opt/em-agent-tools/editretro:ro\n'), NEW_IMAGE, editretro_tools=True)
+
     # @spec CNT2D-007 — Independent, read-only conduction runtime; rollback keeps old mounts.
     def test_cnt2d_mount_is_independent_and_idempotent(self):
         result = deploy.render_compose(COMPOSE, NEW_IMAGE, cnt2d_tools=True)
