@@ -48,6 +48,17 @@ const applications: ScienceApplication[] = [
     timeout_seconds: 900,
   },
   {
+    id: "molgen",
+    name: "分子生成",
+    category: "generation",
+    available: true,
+    methods: ["ChemTSv3"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  },
+  {
     id: "mineru",
     name: "MinerU",
     category: "document",
@@ -210,6 +221,74 @@ describe("manual scientific applications", () => {
         expect.anything(),
       ),
     );
+  });
+
+  // @spec MG-003 — Parameter-only generation derives total cores and sends no structure.
+  it("submits molecular-generation parameters without structure input", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ScienceAppsPage appId="molgen" jobId={null} onSelectJob={vi.fn()} />,
+    );
+    await screen.findByTestId("science-submit");
+    expect(
+      screen.queryByLabelText("SCIENCE$UPLOAD_XYZ"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("SCIENCE$XYZ_INPUT")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("SCIENCE$MOLGEN_WORKERS"), {
+      target: { value: "4" },
+    });
+    await user.click(screen.getByTestId("science-submit"));
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          app_id: "molgen",
+          task: "generation",
+          method: "ChemTSv3",
+          molgen_workers: 4,
+          molgen_seconds: 600,
+          molgen_seed: 20261030,
+          cores: 5,
+          xyz: "",
+          smiles: "",
+        }),
+        expect.anything(),
+      ),
+    );
+  });
+
+  // @spec MG-003 — Show generated counts and the ranked molecules from a verified result.
+  it("renders molecular-generation counts and top molecules", async () => {
+    vi.mocked(scienceAppsService.job).mockResolvedValue({
+      ...job,
+      app_id: "molgen",
+      status: "succeeded",
+      result: {
+        generated_records: 12,
+        unique_generated: 10,
+        generated_pool_rows: 9,
+        top_molecules: [
+          {
+            smiles: "C[N+](=O)[O-]",
+            reward: 0.5,
+            density: 1.5,
+            BDE: 90,
+            Td: 200,
+            detoD: 7000,
+            sa_score: 2,
+            heavy_atom_count: 10,
+          },
+        ],
+      },
+      files: [{ name: "results.zip", size: 1000 }],
+    });
+    renderWithProviders(
+      <ScienceAppsPage appId="molgen" jobId="abc" onSelectJob={vi.fn()} />,
+    );
+    expect(
+      await screen.findByText("SCIENCE$MOLGEN_COUNTS"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("C[N+](=O)[O-]")).toBeInTheDocument();
+    expect(screen.getByText("SCIENCE$MOLGEN_TOP")).toBeInTheDocument();
   });
 
   // @spec CNT2D-006 — Render conductivity with its physical unit and retained download actions.

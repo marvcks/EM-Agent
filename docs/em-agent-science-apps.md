@@ -181,6 +181,42 @@ em-morphology download JOB_ID ./morphology-results
 原代码、权重与案例未修改；训练分支默认的无限占核已被禁用，禁止在服务内触发
 完整贝叶斯调参或重训。
 
+## 分子生成（ChemTSv3 Pareto）
+
+入口 **科学应用 → 分子生成**（`/canvas/science-apps/molgen`）。这是用户提供的
+Pareto_Mul_2 工作流：ChemTSv3 的 MCTS + RNN 在 SMILES 空间生成 CHON 含能分子，
+固定筛选规则（元素白名单、硝基、芳香环、环拓扑、重原子/支链）和
+`DensityParetoRewardV4` 打分，9 个 ChemProp 模型预测密度、爆速
+（detoD/detoP/detoQ/detoT/detoV）、BDE、生成焓与热分解温度。页面不需要结构或
+SMILES，只填写搜索进程数（1–7）、每个进程的生成时长（手动页面 60–720 秒）、
+随机种子和申请内存；总核数自动为进程数 + 1（另一个进程每五分钟合并 Pareto 池），
+不超过 8 核。默认 2 个进程、600 秒、3 核、4096 MB。
+
+服务器运行时位于 `/opt/em-agent-tools/molgen`，Python 3.11.11，锁定
+ChemTSv3 引擎、RNN 模型、9 个性质模型、1,561 条初始参考池及依赖；任务运行时
+校验应用文件清单（152 项）和模型散列，不联网、不训练、不修改筛选与奖励规则。
+宿主机与容器验收数据见本地 `MOLGEN-EM-Agent-deployment-report.txt`。
+
+`result.json` 记录各 worker 退出码、生成记录数、唯一分子数、Pareto 池中本次生成
+分子数、最优奖励和模型散列；`molecules.csv` 是合并后的 Pareto 池（前 1,561 条为
+初始参考记录，`source_type=run_generated` 为本次生成）；`top_molecules.csv`
+为按奖励排序的前 10 个分子；`results.zip` 包含各 worker 的 CSV、日志、曲线、
+检查点、配置及合并日志。所有性质是模型预测值，不是实验测量；有限随机搜索不保证
+全局最优，排序不代表合成可行性。沿用串行队列、10 项未结束任务、8 核/8192 MB
+申请；手动任务限 900 秒（页面建议每进程不超过 600 秒），Agent 提交无平台总时长
+上限，由 Agent 查询状态并决定取消。
+
+Agent 新对话加载 `molgen` 技能，经同一 `/api/science` 队列提交：
+
+```sh
+em-molgen submit --workers 2 --seconds 600 --seed 20261030 --cores 3 --memory-mb 4096
+em-molgen status JOB_ID
+em-molgen cancel JOB_ID
+em-molgen download JOB_ID ./molgen-results
+```
+
+更长的生成任务使用对话入口，`--seconds` 最大 7200；单机 8 核上限不变。
+
 ## 2026-10-19 开发纪要
 
 - 新 fork 保留现有 OpenHands Agent 能力，补科学应用手动工作台和第三方 Apps 入口收敛；具体需求记在根 `AGENTS.md`。

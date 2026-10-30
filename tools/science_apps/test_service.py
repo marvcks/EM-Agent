@@ -107,6 +107,57 @@ class ScienceTests(unittest.TestCase):
                 self.assertEqual(client.post('/api/science/jobs', headers=headers,
                     json={'app_id': 'xtb', 'xyz': WATER}).status_code, 422)
 
+    # @spec MG-003 — Bounded generation requests never accept structures or shell input.
+    def test_molgen_contract_and_verified_pool_gate(self):
+        from tools.science_apps.molgen_runner import verified_molgen
+        request = JobRequest(app_id='molgen', task='generation', method='ChemTSv3',
+                             molgen_workers=2, molgen_seconds=600, molgen_seed=7,
+                             cores=3, memory_mb=4096)
+        name, content, args = prepare_input(request)
+        self.assertEqual((name, args), ('request.json', ['request.json']))
+        self.assertEqual(__import__('json').loads(content)['molgen_workers'], 2)
+        for change in ({'task': 'energy'}, {'xyz': WATER}, {'smiles': 'CCO'},
+                       {'charge': 1}, {'method': 'MCTS'}, {'table_csv': 'a,b'},
+                       {'molgen_workers': 8}, {'molgen_seconds': 30},
+                       {'cores': 2}, {'memory_mb': 512}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                prepare_input(request.model_copy(update=change))
+        result = {'app_id': 'molgen', 'verified': True, 'workers': 2,
+                  'generation_seconds': 600, 'seed': 7,
+                  'generated_records': 5, 'unique_generated': 5,
+                  'pool_rows': 10, 'generated_pool_rows': 5, 'best_reward': 0.5,
+                  'worker_results': [
+                      {'run_id': 'run_00', 'exit_code': 0, 'done': True, 'records': 3, 'best_reward': 0.5},
+                      {'run_id': 'run_01', 'exit_code': 0, 'done': True, 'records': 2, 'best_reward': 0.4}],
+                  'top_molecules': [{'smiles': 'C[N+](=O)[O-]', 'reward': 0.5}]}
+        self.assertTrue(verified_molgen(result, request))
+        for change in ({'generated_records': 0}, {'seed': 8}, {'workers': 1},
+                       {'worker_results': result['worker_results'][:1]},
+                       {'worker_results': [{**result['worker_results'][0], 'done': False},
+                                           result['worker_results'][1]]},
+                       {'top_molecules': []}, {'generated_pool_rows': 0}):
+            with self.subTest(change=change):
+                self.assertFalse(verified_molgen({**result, **change}, request))
+        async def exercise(root):
+            executable = root / 'molgen-test'
+            manager = Manager(root / 'jobs')
+            with patch('tools.science_apps.service.application_executable', return_value=str(executable)):
+                for valid in (False, True):
+                    executable.write_text('#!/bin/sh\n' +
+                        ("echo '%s' > result.json\ntouch molecules.csv\n"
+                         "python3 -c 'from zipfile import ZipFile; ZipFile(\"results.zip\",\"w\").close()'\n" %
+                         __import__('json').dumps(result) if valid else '') +
+                        'echo EM_AGENT_MOLGEN_COMPLETE\n')
+                    executable.chmod(0o755)
+                    job = manager.submit(request)
+                    await manager.run(job['id'])
+                    detail = manager.detail(job['id'])
+                    self.assertEqual(detail['status'], 'succeeded' if valid else 'failed')
+                    self.assertEqual(detail.get('result'), result if valid else None)
+                    self.assertIsNone(detail['energy_hartree'])
+        with tempfile.TemporaryDirectory() as folder:
+            asyncio.run(exercise(Path(folder)))
+
     # @spec SJT-001 — Every bundled Agent CLI marks actual submission requests
     def test_agent_cli_submission_headers(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -124,6 +175,7 @@ class ScienceTests(unittest.TestCase):
                 ('em-morphology', ['--additive-percent', '1', '--antisolvent-temp-c', '10',
                                    '--stirring-rpm', '300', '--concentration-g-ml', '0.06',
                                    '--solvent-ratio', '0.125']),
+                ('em-molgen', ['--workers', '2', '--seconds', '600']),
             ]
             for name, args in cases:
                 with self.subTest(cli=name), patch.dict('os.environ', {'LOCAL_BACKEND_API_KEY': 'test-key'}), \

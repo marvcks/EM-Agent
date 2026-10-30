@@ -21,6 +21,7 @@ export const SCIENCE_APP_IDS = [
   "aizynthfinder",
   "lcms2yield",
   "bde",
+  "molgen",
 ] as const;
 export const SCIENCE_MORPHOLOGY_FEATURES = [
   "添加剂百分比",
@@ -75,7 +76,8 @@ export interface ScienceApplication {
     | "crystal"
     | "reaction"
     | "bond"
-    | "document";
+    | "document"
+    | "generation";
   available: boolean;
   methods: string[];
   bases: string[];
@@ -102,7 +104,8 @@ export interface ScienceJobRequest {
     | "bde"
     | "textify"
     | "classification"
-    | "conduction";
+    | "conduction"
+    | "generation";
   document_name?: string;
   language?: "en" | "ch";
   enable_formula?: boolean;
@@ -132,6 +135,9 @@ export interface ScienceJobRequest {
   max_routes?: number;
   top_k?: number;
   augmentations?: number;
+  molgen_workers?: number;
+  molgen_seconds?: number;
+  molgen_seed?: number;
 }
 export interface ScienceJob {
   id: string;
@@ -187,6 +193,24 @@ export interface ScienceJob {
       predicted_label: string;
       probabilities: Record<string, number>;
       in_training_range: boolean;
+    }[];
+    workers?: number;
+    generation_seconds?: number;
+    seed?: number;
+    generated_records?: number;
+    unique_generated?: number;
+    pool_rows?: number;
+    generated_pool_rows?: number;
+    best_reward?: number | null;
+    top_molecules?: {
+      smiles: string;
+      reward: number;
+      density: number | null;
+      BDE: number | null;
+      Td: number | null;
+      detoD: number | null;
+      sa_score: number | null;
+      heavy_atom_count: number | null;
     }[];
   };
   exit_code: number | null;

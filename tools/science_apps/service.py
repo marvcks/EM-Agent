@@ -31,6 +31,7 @@ from .mineru_runner import MAX_DOCUMENT_BYTES, mineru_available, validate_docume
 from .morphology_runner import morphology_available, validate_morphology, verified_morphology
 from .cnt2d_runner import cnt2d_available, validate_cnt2d, verified_cnt2d
 from .editretro_runner import editretro_available, validate_editretro, verified_editretro
+from .molgen_runner import molgen_available, validate_molgen, verified_molgen
 
 PREFIX = '/api/science'
 MAX_LOG_BYTES = 10 * 1024 * 1024
@@ -38,6 +39,7 @@ TIMEOUT_SECONDS = 900
 ACTIVE = {'queued', 'running'}
 ELEMENTS = ('H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og').split()
 APPLICATIONS = {
+    'molgen': {'name': '分子生成', 'executable': 'molgen-generate', 'methods': ['ChemTSv3'], 'bases': [], 'category': 'generation'},
     'editretro': {'name': 'EditRetro', 'executable': 'editretro-predict', 'methods': ['2D'], 'bases': [], 'category': 'reaction'},
     'cnt2d': {'name': 'CNT 二维导热', 'executable': 'cnt2d-solve', 'methods': ['FEM-P2'], 'bases': [], 'category': 'thermal'},
     'mineru': {'name': 'MinerU', 'executable': 'mineru-parse', 'methods': ['vlm', 'pipeline'], 'bases': [], 'category': 'document'},
@@ -56,6 +58,8 @@ APPLICATIONS = {
 
 def application_executable(app_id):
     executable = shutil.which(APPLICATIONS[app_id]['executable'])
+    if app_id == 'molgen' and not molgen_available():
+        return None
     if app_id == 'editretro' and not editretro_available():
         return None
     if app_id == 'cnt2d' and not cnt2d_available():
@@ -76,7 +80,7 @@ def application_executable(app_id):
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology', 'cnt2d', 'editretro']
+    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology', 'cnt2d', 'editretro', 'molgen']
     top_k: int = Field(default=20, ge=1, le=20)
     augmentations: int = Field(default=20, ge=1, le=20)
     cnt_parameters: dict[str, float | int | str] | None = None
@@ -91,7 +95,7 @@ class JobRequest(BaseModel):
     input_kind: Literal['smiles', 'name'] = 'smiles'
     compound_name: str = Field(default='', max_length=256)
     title: str = Field(default='', max_length=80)
-    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde', 'textify', 'classification', 'conduction'] = 'energy'
+    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde', 'textify', 'classification', 'conduction', 'generation'] = 'energy'
     method: str = ''
     basis: str = ''
     charge: int = Field(default=0, ge=-10, le=10)
@@ -115,6 +119,9 @@ class JobRequest(BaseModel):
     search_seconds: int = Field(default=60, ge=1, le=600)
     max_transforms: int = Field(default=6, ge=1, le=10)
     max_routes: int = Field(default=10, ge=1, le=25)
+    molgen_workers: int = Field(default=2, ge=1, le=7)
+    molgen_seconds: int = Field(default=600, ge=60, le=7200)
+    molgen_seed: int = Field(default=20261030, ge=0, le=2147483647)
 
 
 def now():
@@ -154,6 +161,10 @@ def prepare_input(request):
     basis = request.basis or (config['bases'][0] if config['bases'] else '')
     if method not in config['methods'] or (basis and basis not in config['bases']):
         raise ValueError('invalid_method')
+    if request.app_id == 'molgen':
+        request.method = method
+        validate_molgen(request)
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
     if request.app_id == 'editretro':
         request.method = method
         validate_editretro(request)
@@ -338,7 +349,7 @@ class Manager:
         # PyTorch multiprocessing uses Unix sockets beneath TMPDIR. Persistent
         # job paths exceed AF_UNIX's path limit, so reaction jobs get a short,
         # private scratch path. The same finally block removes it on stop/failure.
-        if request.app_id in REACTION_APPS or request.app_id == 'editretro':
+        if request.app_id in REACTION_APPS or request.app_id in ('editretro', 'molgen'):
             scratch = Path(tempfile.mkdtemp(prefix='em-science-', dir='/tmp'))
         else:
             scratch = directory / 'scratch'
@@ -376,7 +387,8 @@ class Manager:
             markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE',
                        'editretro': 'EM_AGENT_EDITRETRO_COMPLETE',
                        'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE', 'mineru': 'EM_AGENT_MINERU_COMPLETE',
-                       'crystal-morphology': 'EM_AGENT_MORPHOLOGY_COMPLETE', 'cnt2d': 'EM_AGENT_CNT2D_COMPLETE'}
+                       'crystal-morphology': 'EM_AGENT_MORPHOLOGY_COMPLETE', 'cnt2d': 'EM_AGENT_CNT2D_COMPLETE',
+                       'molgen': 'EM_AGENT_MOLGEN_COMPLETE'}
             if job['status'] != 'cancelled':
                 success = job['exit_code'] == 0 and markers[job['app_id']].lower() in text.lower() and not job['error']
                 if success and job['app_id'] == 'magus':
@@ -414,6 +426,13 @@ class Manager:
                 if success and job['app_id'] == 'editretro':
                     result = json.loads((directory / 'result.json').read_text())
                     success = verified_editretro(result, request) and (directory / 'results.zip').is_file()
+                    if success:
+                        job['result'] = result
+                if success and job['app_id'] == 'molgen':
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = (verified_molgen(result, request)
+                               and (directory / 'results.zip').is_file()
+                               and (directory / 'molecules.csv').is_file())
                     if success:
                         job['result'] = result
                 job['status'] = 'succeeded' if success else 'failed'

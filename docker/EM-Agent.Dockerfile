@@ -50,6 +50,7 @@ LABEL io.em-agent.crystal-morphology="1"
 LABEL io.em-agent.analysis="1"
 LABEL io.em-agent.cnt2d="1"
 LABEL io.em-agent.editretro="1"
+LABEL io.em-agent.molgen="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${SOURCE_COMMIT}
 USER root
@@ -81,5 +82,7 @@ RUN install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magu
  && install -m 755 /opt/agent-canvas/science_apps/em-morphology /usr/local/bin/em-morphology \
  && install -m 755 /opt/agent-canvas/science_apps/cnt2d-solve /usr/local/bin/cnt2d-solve \
  && install -m 755 /opt/agent-canvas/science_apps/em-cnt2d /usr/local/bin/em-cnt2d \
- && install -m 755 /opt/agent-canvas/science_apps/editretro-predict /usr/local/bin/editretro-predict
+ && install -m 755 /opt/agent-canvas/science_apps/editretro-predict /usr/local/bin/editretro-predict \
+ && install -m 755 /opt/agent-canvas/science_apps/molgen-generate /usr/local/bin/molgen-generate \
+ && install -m 755 /opt/agent-canvas/science_apps/em-molgen /usr/local/bin/em-molgen
 USER openhands

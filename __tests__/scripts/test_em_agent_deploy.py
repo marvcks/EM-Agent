@@ -42,6 +42,17 @@ class DeploymentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             deploy.render_compose(COMPOSE.replace('    volumes:\n', '    volumes:\n      - /other:/opt/em-agent-tools/editretro:ro\n'), NEW_IMAGE, editretro_tools=True)
 
+    # @spec MG-004 — Molecular-generation runtime mounts stay independent and rollback-safe.
+    def test_molgen_mount_is_independent_and_idempotent(self):
+        result = deploy.render_compose(COMPOSE, NEW_IMAGE, molgen_tools=True)
+        self.assertIn('/opt/em-agent-tools/molgen:/opt/em-agent-tools/molgen:ro', result)
+        self.assertIn('/opt/em-agent-tools/python:/opt/em-agent-tools/python:ro', result)
+        self.assertNotIn('/opt/em-agent-tools/editretro', result)
+        self.assertEqual(deploy.render_compose(result, NEW_IMAGE, molgen_tools=True), result)
+        self.assertNotIn('/opt/em-agent-tools/molgen', deploy.render_compose(COMPOSE, OLD_IMAGE))
+        with self.assertRaises(ValueError):
+            deploy.render_compose(COMPOSE.replace('    volumes:\n', '    volumes:\n      - /other:/opt/em-agent-tools/molgen:ro\n'), NEW_IMAGE, molgen_tools=True)
+
     # @spec CNT2D-007 — Independent, read-only conduction runtime; rollback keeps old mounts.
     def test_cnt2d_mount_is_independent_and_idempotent(self):
         result = deploy.render_compose(COMPOSE, NEW_IMAGE, cnt2d_tools=True)

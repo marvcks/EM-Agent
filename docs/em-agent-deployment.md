@@ -241,6 +241,28 @@ uv sync --frozen --project /opt/em-agent-tools/crystal-morphology \
 启动时仅在无同名用户技能时链接 `crystal-morphology`。具体验收见本地
 `CRYSTAL-MORPHOLOGY-EM-Agent-deployment-report.txt`。
 
+### 分子生成运行时
+
+带 `io.em-agent.molgen=1` 的镜像独立检查 `/opt/em-agent-tools/molgen` 的
+`.venv/bin/python`、`.venv/bin/chemtsv3`、`manifest.json`、应用配置、RNN 模型和
+9 个 ChemProp 模型，再添加 `/opt/em-agent-tools/molgen` 与共享 Python 的只读挂载。
+运行时用仓库内 `tools/science_apps/runtime/molgen/{pyproject.toml,uv.lock}`
+（Python 3.11.11，CPU Torch 2.10.0、RDKit 2025.9.5、ChemProp 2.2.2 等）重建；
+应用源码来自用户迁移包 `Pareto_Mul_2_migration_20261026.zip`，解压到
+`/opt/em-agent-tools/molgen/app`：
+
+```sh
+UV_PYTHON_INSTALL_DIR=/opt/em-agent-tools/python /root/.local/bin/uv python install 3.11.11
+MOLGEN_SOURCE_ZIP=/root/EM-Agent-Tools/molgen/installers/Pareto_Mul_2_migration_20261026.zip \
+  UV_BIN=/root/.local/bin/uv bash scripts/em-agent/install-molgen-runtime.sh
+```
+
+安装器按冻结锁重建依赖，`--no-deps -e` 安装包内 ChemTSv3 引擎，再写包含
+应用文件散列、模型散列、初始池行数和锁文件散列的 `manifest.json`。
+部署前比较该 manifest 与候选镜像内的 `uv.lock`，防止误挂不匹配环境。
+容器启动仅在没有同名用户技能时链接自带 `molgen` 技能；CLI 为 `em-molgen`。
+模型、运行环境、参考池和安装器不进入应用镜像。
+
 ### MinerU 云端适配
 
 镜像包含标准库适配器 `mineru-parse`、共用队列 CLI `em-mineru` 和 `mineru` 使用技能。

@@ -14,6 +14,9 @@ const path = require('path');
 // only when the English value is genuinely correct for all languages.
 const IDENTICAL_VALUE_ALLOWLIST = new Set([
   'SCIENCE$CNT_UNIT', // SI unit notation is language-independent.
+  'SCIENCE$MOLGEN_SMILES', // SMILES is a cheminformatics term used verbatim.
+  'SCIENCE$MOLGEN_BDE', // BDE and its unit are language-independent.
+  'SCIENCE$MOLGEN_TD', // Td and its unit are language-independent.
   'SCIENCE$ENERGY_VALUE',
   'SCIENCE$ENERGY_EV_VALUE',
   'SCIENCE$FILE_SIZE',
