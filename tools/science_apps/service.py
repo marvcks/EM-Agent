@@ -564,7 +564,9 @@ def create_app(root=None, key=None):
 
     @app.get(PREFIX + '/jobs')
     async def jobs():
-        return [{k: v for k, v in job.items() if k != 'request'} for job in sorted(app.state.manager.jobs.values(), key=lambda item: item['created_at'], reverse=True)[:100]]
+        # The history list never renders scientific results; keep the polled
+        # payload bounded and let the detail endpoint return the full result.
+        return [{k: v for k, v in job.items() if k not in ('request', 'result')} for job in sorted(app.state.manager.jobs.values(), key=lambda item: item['created_at'], reverse=True)[:100]]
 
     @app.post(PREFIX + '/jobs', status_code=201)
     async def submit(request: JobRequest,

@@ -87,11 +87,20 @@ class RGCN(th.nn.Module):
 
     def forward(self, batch):
         x, src, dst, etype, graph_id, smask = batch
+        # Group edges by bond type once per batch. Gathering W[etype] for every
+        # edge materialises (|E|, in, out) per layer, which exceeded memory for
+        # MP's 1024-molecule batches; per-type matmuls are mathematically equal.
+        edge_groups = []
+        for relation in range(65):
+            index = th.nonzero(etype == relation, as_tuple=False).squeeze(1)
+            if index.numel():
+                edge_groups.append((relation, src[index], dst[index]))
         for layer in self.layers:
             previous = x
             weight = (layer.coeff @ layer.W.reshape(65, -1)).reshape(65, layer.W.shape[1], layer.W.shape[2])
-            message = th.bmm(x[src].unsqueeze(1), weight[etype]).squeeze(1)
-            aggregate = th.zeros(x.shape[0], message.shape[1], dtype=x.dtype).index_add_(0, dst, message)
+            aggregate = th.zeros(x.shape[0], weight.shape[2], dtype=x.dtype)
+            for relation, group_src, group_dst in edge_groups:
+                aggregate.index_add_(0, group_dst, x[group_src] @ weight[relation])
             x = th.relu(aggregate + layer.h_bias + previous @ layer.loop)
             x = x + th.relu(previous @ layer.res.weight.t() + layer.res.bias)
             x = layer.bn(x)
