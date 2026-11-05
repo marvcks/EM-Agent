@@ -26,6 +26,17 @@ vi.mock("#/api/science-apps-service", async (importOriginal) => ({
 }));
 const applications: ScienceApplication[] = [
   {
+    id: "image-cnn",
+    name: "图像导热分类",
+    category: "thermal",
+    available: true,
+    methods: ["ResNet18"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  },
+  {
     id: "editretro",
     name: "EditRetro",
     category: "reaction",
@@ -189,6 +200,60 @@ beforeEach(() => {
 });
 
 describe("manual scientific applications", () => {
+  // @spec IC-004 — Example submits to the shared queue; invalid replacement clears upload.
+  it("submits image classification and clears rejected image selections", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ScienceAppsPage appId="image-cnn" jobId={null} onSelectJob={vi.fn()} />,
+    );
+    const submit = await screen.findByTestId("science-submit");
+    expect(submit).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", { name: "SCIENCE$IMAGE_EXAMPLE" }),
+    );
+    await user.click(submit);
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          app_id: "image-cnn",
+          task: "classification",
+          image_example: true,
+          image_base64: "",
+          method: "ResNet18",
+          xyz: "",
+        }),
+        expect.anything(),
+      ),
+    );
+    fireEvent.change(screen.getByLabelText("SCIENCE$IMAGE_UPLOAD"), {
+      target: { files: [new File(["x"], "bad.txt")] },
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "SCIENCE$IMAGE_ERROR",
+    );
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("SCIENCE$IMAGE_UPLOAD"), {
+      target: {
+        files: [
+          new File(["png-content"], "microstructure.png", {
+            type: "image/png",
+          }),
+        ],
+      },
+    });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await user.click(submit);
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          image_example: false,
+          image_base64: btoa("png-content"),
+        }),
+        expect.anything(),
+      ),
+    );
+  });
+
   // @spec CNT2D-005 — Non-molecular parameters submit through the shared science API.
   it("submits CNT geometry and material parameters without molecular fields", async () => {
     const user = userEvent.setup();
@@ -233,7 +298,9 @@ describe("manual scientific applications", () => {
     expect(
       screen.queryByLabelText("SCIENCE$UPLOAD_XYZ"),
     ).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("SCIENCE$XYZ_INPUT")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("SCIENCE$XYZ_INPUT"),
+    ).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("SCIENCE$MOLGEN_WORKERS"), {
       target: { value: "4" },
     });

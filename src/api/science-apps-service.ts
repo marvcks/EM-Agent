@@ -10,6 +10,7 @@ export const SCIENCE_EXAMPLE_XYZ =
 export const SCIENCE_MAGUS_EXAMPLE_XYZ =
   "5\nMethane\nC 0 0 0\nH 0.63 0.63 0.63\nH -0.63 -0.63 0.63\nH -0.63 0.63 -0.63\nH 0.63 -0.63 -0.63\n";
 export const SCIENCE_APP_IDS = [
+  "image-cnn",
   "editretro",
   "cnt2d",
   "mineru",
@@ -86,6 +87,8 @@ export interface ScienceApplication {
   timeout_seconds: number;
 }
 export interface ScienceJobRequest {
+  image_base64?: string;
+  image_example?: boolean;
   cnt_parameters?: ScienceCNTParameters;
   cnt_corners?: string;
   cnt_seed?: number;
@@ -151,6 +154,9 @@ export interface ScienceJob {
   energy_hartree: number | null;
   energy_ev?: number | null;
   result?: {
+    probability_class1?: number;
+    predicted_class?: 0 | 1;
+    gradcam_files?: string[];
     unit?: string;
     metrics?: {
       Keff_X: number;

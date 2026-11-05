@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /opt/em-agent-tools/image-cnn/.venv/bin/python -I /opt/agent-canvas/science_apps/image_cnn_runner.py "$@"

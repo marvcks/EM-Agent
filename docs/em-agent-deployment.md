@@ -273,3 +273,19 @@ MOLGEN_SOURCE_ZIP=/root/EM-Agent-Tools/molgen/installers/Pareto_Mul_2_migration_
 更新凭据文件无需重建镜像；首次启用技能需容器启动并新建对话。
 入口上传最大 20 MiB，已有 Nginx 100m 限制可容纳。转换失败须检查上游凭据/额度/文档限制，
 不能用降级模拟结果验收。完整原始结果包与 Markdown 随 science-apps 数据持久保存。
+
+### 图像导热分类运行时
+
+`io.em-agent.image-cnn=1` 独立检查并只读挂载 `/opt/em-agent-tools/image-cnn`
+与共享 Python。先将用户 `cla_5/resnet18_opt1.pth` 与示例 `images_1000/pg1.png`
+放为 `model.pth`、`example.png`，再执行：
+
+```sh
+UV_BIN=/root/.local/bin/uv bash scripts/em-agent/install-image-cnn-runtime.sh
+```
+
+Python3.11.15，CPU Torch2.10.0/torchvision0.25.0，NumPy2.4.2/Pillow13.0.0。
+冻结锁、权重/示例散列、严格加载检查写入manifest；构建和部署核对锁散列。
+下载源慢时可设置 `IMAGE_CNN_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple`，
+通过冻结版本与发行文件哈希切换传输，不改版本。推理前再次校验权重与运行时锁。
+镜像只包含适配器、CLI与使用技能；权重和环境不进Git或镜像。保留同名用户技能。

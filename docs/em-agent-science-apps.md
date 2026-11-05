@@ -333,3 +333,24 @@ em-mineru download JOB_ID ./mineru-results
 ```
 
 解析文本须核对原文后用于数据挖掘/标注；此步骤不自动生成科研真值标签。
+
+## 图像导热分类（ResNet18）
+
+科学应用 `/canvas/science-apps/image-cnn`，Agent 新对话加载 `image-cnn` 技能，
+用 `em-image-cnn submit image.png` 或 `em-image-cnn submit --example` 提交到同一队列；
+`status/cancel/download` 沿用任务 ID。页面无需 Agent/LLM。
+
+输入单张 PNG ≤512 KiB，每边32–5000像素，总像素≤2000万；透明区域合成白色。
+固定用户 `image_CN_1030` 包 `models/cla_5/resnet18_opt1.pth`，SHA-256
+`fe02a72c0013edfa32b6075884b1486753fcf56dd1d9fd6cd8c94dcc74085299`。
+严格加载 ResNet18 单 logit；CPU 推理，灰度→224×224→RGB，mean/std均0.5，
+与随包训练脚本一致。修正原可视化脚本采用ImageNet归一化的不一致，不联网下载权重或训练。
+
+实验性输出0/1类别、未经校准的P(类别1)，固定概率阈值0.5。资料中两套数据复用图片编号但标签不同，权重与数据版本对应尚未确认，
+类别顺序、单位和黑白相代表的材料未确认；不输出带物理单位的导热率，不宣称通用照片识别。
+五层Grad-CAM叠加PNG均针对正类logit，颜色在每张图内归一化，非因果传热路径。
+原图、result.json、五张PNG和results.zip均可下载。成功标记表示推理/文件契约检查通过，
+不表示模型精度通过独立科研验证，历史90.5%记录不作为此权重的验收准确率。
+
+沿用串行队列、最多10项、最多8核/8192MB；固定内存申请2048MB（不是OS硬隔离）。
+手动900秒，Agent监控决定停止；重启不自动恢复任务。

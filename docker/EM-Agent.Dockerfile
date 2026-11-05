@@ -49,6 +49,7 @@ LABEL io.em-agent.bde="1"
 LABEL io.em-agent.crystal-morphology="1"
 LABEL io.em-agent.analysis="1"
 LABEL io.em-agent.cnt2d="1"
+LABEL io.em-agent.image-cnn="1"
 LABEL io.em-agent.editretro="1"
 LABEL io.em-agent.molgen="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
@@ -69,7 +70,9 @@ RUN mv /usr/local/bin/claude-agent-acp /usr/local/bin/claude-agent-acp.upstream 
 RUN chmod 755 /opt/agent-canvas/entrypoint.sh
 COPY tools/science_apps/ /opt/agent-canvas/science_apps/
 COPY CNT2D_COMSOL_20260930/python/cnt2d/ /opt/agent-canvas/science_apps/cnt2d/
-RUN install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magus-mace \
+RUN install -m 755 /opt/agent-canvas/science_apps/image-cnn-predict /usr/local/bin/image-cnn-predict \
+ && install -m 755 /opt/agent-canvas/science_apps/em-image-cnn /usr/local/bin/em-image-cnn \
+ && install -m 755 /opt/agent-canvas/science_apps/magus-mace /usr/local/bin/magus-mace \
  && install -m 755 /opt/agent-canvas/science_apps/em-magus /usr/local/bin/em-magus \
  && install -m 755 /opt/agent-canvas/science_apps/aizynth-route /usr/local/bin/aizynth-route \
  && install -m 755 /opt/agent-canvas/science_apps/lcms-cf /usr/local/bin/lcms-cf \

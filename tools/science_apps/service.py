@@ -29,6 +29,7 @@ from .reaction_runner import REACTION_APPS, runtime_available, validate_request,
 from .bde_runner import bde_available, validate_bde, verified_bde
 from .mineru_runner import MAX_DOCUMENT_BYTES, mineru_available, validate_document, verified_mineru
 from .morphology_runner import morphology_available, validate_morphology, verified_morphology
+from .image_cnn_runner import image_cnn_available, validate_image_cnn, verified_image_cnn
 from .cnt2d_runner import cnt2d_available, validate_cnt2d, verified_cnt2d
 from .editretro_runner import editretro_available, validate_editretro, verified_editretro
 from .molgen_runner import molgen_available, validate_molgen, verified_molgen
@@ -39,6 +40,7 @@ TIMEOUT_SECONDS = 900
 ACTIVE = {'queued', 'running'}
 ELEMENTS = ('H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og').split()
 APPLICATIONS = {
+    'image-cnn': {'name': '图像导热分类', 'executable': 'image-cnn-predict', 'methods': ['ResNet18'], 'bases': [], 'category': 'thermal'},
     'molgen': {'name': '分子生成', 'executable': 'molgen-generate', 'methods': ['ChemTSv3'], 'bases': [], 'category': 'generation'},
     'editretro': {'name': 'EditRetro', 'executable': 'editretro-predict', 'methods': ['2D'], 'bases': [], 'category': 'reaction'},
     'cnt2d': {'name': 'CNT 二维导热', 'executable': 'cnt2d-solve', 'methods': ['FEM-P2'], 'bases': [], 'category': 'thermal'},
@@ -58,6 +60,8 @@ APPLICATIONS = {
 
 def application_executable(app_id):
     executable = shutil.which(APPLICATIONS[app_id]['executable'])
+    if app_id == 'image-cnn' and not image_cnn_available():
+        return None
     if app_id == 'molgen' and not molgen_available():
         return None
     if app_id == 'editretro' and not editretro_available():
@@ -80,7 +84,9 @@ def application_executable(app_id):
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology', 'cnt2d', 'editretro', 'molgen']
+    app_id: Literal['image-cnn', 'xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology', 'cnt2d', 'editretro', 'molgen']
+    image_base64: str = Field(default='', max_length=699052)
+    image_example: bool = False
     top_k: int = Field(default=20, ge=1, le=20)
     augmentations: int = Field(default=20, ge=1, le=20)
     cnt_parameters: dict[str, float | int | str] | None = None
@@ -161,6 +167,10 @@ def prepare_input(request):
     basis = request.basis or (config['bases'][0] if config['bases'] else '')
     if method not in config['methods'] or (basis and basis not in config['bases']):
         raise ValueError('invalid_method')
+    if request.app_id == 'image-cnn':
+        request.method = method
+        validate_image_cnn(request)
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
     if request.app_id == 'molgen':
         request.method = method
         validate_molgen(request)
@@ -384,7 +394,7 @@ class Manager:
                         continue
                 job['exit_code'] = await self.process.wait()
             text = log_path.read_text(errors='replace')
-            markers = {'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE',
+            markers = {'image-cnn': 'EM_AGENT_IMAGE_CNN_COMPLETE', 'xtb': 'normal termination of xtb', 'orca': 'ORCA TERMINATED NORMALLY', 'gaussian': 'Normal termination of Gaussian', 'magus': 'EM_AGENT_MAGUS_COMPLETE',
                        'editretro': 'EM_AGENT_EDITRETRO_COMPLETE',
                        'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE', 'mineru': 'EM_AGENT_MINERU_COMPLETE',
                        'crystal-morphology': 'EM_AGENT_MORPHOLOGY_COMPLETE', 'cnt2d': 'EM_AGENT_CNT2D_COMPLETE',
@@ -416,6 +426,11 @@ class Manager:
                 if success and job['app_id'] == 'crystal-morphology':
                     result = json.loads((directory / 'result.json').read_text())
                     success = verified_morphology(result, request)
+                    if success:
+                        job['result'] = result
+                if success and job['app_id'] == 'image-cnn':
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = verified_image_cnn(result, request, directory)
                     if success:
                         job['result'] = result
                 if success and job['app_id'] == 'cnt2d':
@@ -492,10 +507,27 @@ def create_app(root=None, key=None):
         if not hmac.compare_digest(supplied.encode(), app.state.session_key.encode()):
             return JSONResponse({'detail': 'unauthorized'}, status_code=401)
         if request.method == 'POST' and request.url.path != PREFIX + '/documents':
-            if int(request.headers.get('content-length', '0')) > 131072:
+            # @spec IC-001 — Larger JSON is reserved for bounded image input only.
+            limit = 720896 if request.url.path == PREFIX + '/jobs' else 131072
+            try:
+                declared = int(request.headers.get('content-length', '0'))
+            except ValueError:
                 return JSONResponse({'detail': 'input_too_large'}, status_code=413)
-            if len(await request.body()) > 131072:
+            if declared > limit:
                 return JSONResponse({'detail': 'input_too_large'}, status_code=413)
+            body = bytearray()
+            async for chunk in request.stream():
+                body.extend(chunk)
+                if len(body) > limit:
+                    return JSONResponse({'detail': 'input_too_large'}, status_code=413)
+            request._body = bytes(body)
+            if len(body) > 131072:
+                try:
+                    payload = json.loads(body)
+                except (ValueError, UnicodeDecodeError):
+                    payload = None
+                if not isinstance(payload, dict) or payload.get('app_id') != 'image-cnn':
+                    return JSONResponse({'detail': 'input_too_large'}, status_code=413)
         response = await call_next(request)
         response.headers['Cache-Control'] = 'no-store'
         return response

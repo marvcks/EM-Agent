@@ -36,7 +36,10 @@ import { MorphologyForm, MorphologyResult } from "./morphology-form";
 import { CNT2DForm, CNT2DResult } from "./cnt2d-form";
 import { MolgenForm, MolgenResult } from "./molgen-form";
 
+import { ImageCNNForm, ImageCNNResult } from "./image-cnn-form";
+
 const DESCRIPTION_KEYS = {
+  "image-cnn": I18nKey.SCIENCE$IMAGE_DESCRIPTION,
   molgen: I18nKey.SCIENCE$MOLGEN_DESCRIPTION,
   editretro: I18nKey.SCIENCE$EDITRETRO_DESCRIPTION,
   cnt2d: I18nKey.SCIENCE$CNT_DESCRIPTION,
@@ -58,6 +61,7 @@ const STATUS_KEYS: Record<ScienceJobStatus, I18nKey> = {
   cancelled: I18nKey.SCIENCE$CANCELLED,
 };
 const ERROR_KEYS: Record<string, I18nKey> = {
+  invalid_image_cnn_input: I18nKey.SCIENCE$IMAGE_ERROR,
   invalid_cnt2d_input: I18nKey.SCIENCE$CNT_ERROR,
   invalid_document: I18nKey.SCIENCE$DOCUMENT_ERROR,
   input_too_large: I18nKey.SCIENCE$DOCUMENT_ERROR,
@@ -250,7 +254,13 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
               </span>
             </div>
             <div className="em-science-workbench">
-              {selected.id === "mineru" ? (
+              {selected.id === "image-cnn" ? (
+                <ImageCNNForm
+                  app={selected}
+                  onCreated={onSelectJob}
+                  renderError={(error) => <ErrorMessage error={error} />}
+                />
+              ) : selected.id === "mineru" ? (
                 <MinerUForm
                   app={selected}
                   onCreated={onSelectJob}
@@ -382,17 +392,19 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                     <span>{t(CATEGORY_KEYS[app.category])}</span>
                     <span>
                       {t(
-                        app.category === "document"
-                          ? I18nKey.SCIENCE$DOCUMENT_UPLOAD
-                          : app.id === "cnt2d"
-                            ? I18nKey.SCIENCE$CNT_PARAMETERS
-                            : app.id === "molgen"
-                              ? I18nKey.SCIENCE$MOLGEN_NO_INPUT
-                              : app.id === "crystal-morphology"
-                                ? I18nKey.SCIENCE$MORPHOLOGY_TABLE_INPUT
-                                : app.category === "reaction"
-                                  ? I18nKey.SCIENCE$SMILES_INPUT
-                                  : I18nKey.SCIENCE$XYZ_INPUT,
+                        app.id === "image-cnn"
+                          ? I18nKey.SCIENCE$IMAGE_UPLOAD
+                          : app.category === "document"
+                            ? I18nKey.SCIENCE$DOCUMENT_UPLOAD
+                            : app.id === "cnt2d"
+                              ? I18nKey.SCIENCE$CNT_PARAMETERS
+                              : app.id === "molgen"
+                                ? I18nKey.SCIENCE$MOLGEN_NO_INPUT
+                                : app.id === "crystal-morphology"
+                                  ? I18nKey.SCIENCE$MORPHOLOGY_TABLE_INPUT
+                                  : app.category === "reaction"
+                                    ? I18nKey.SCIENCE$SMILES_INPUT
+                                    : I18nKey.SCIENCE$XYZ_INPUT,
                       )}
                     </span>
                   </div>
@@ -925,6 +937,9 @@ function JobResult({ jobId }: { jobId: string | null }) {
           {job.app_id === "bde" && job.status === "succeeded" && job.result && (
             <BDEResult result={job.result} />
           )}
+          {job.app_id === "image-cnn" &&
+            job.status === "succeeded" &&
+            job.result && <ImageCNNResult result={job.result} />}
           {job.app_id === "cnt2d" &&
             job.status === "succeeded" &&
             job.result && <CNT2DResult result={job.result} />}

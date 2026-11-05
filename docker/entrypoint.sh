@@ -307,6 +307,12 @@ if [ "${EM_AGENT_SCIENCE_APPS:-0}" = "1" ]; then
       fi
     fi
   done
+  if [ -x /opt/em-agent-tools/image-cnn/.venv/bin/python ]; then
+    mkdir -p "$OPENHANDS_DIR/skills"
+    if [ ! -e "$OPENHANDS_DIR/skills/image-cnn" ] && [ ! -L "$OPENHANDS_DIR/skills/image-cnn" ]; then
+      ln -s /opt/agent-canvas/science_apps/skills/image-cnn "$OPENHANDS_DIR/skills/image-cnn"
+    fi
+  fi
   if [ -x /opt/em-agent-tools/cnt2d/.venv/bin/python ]; then
     mkdir -p "$OPENHANDS_DIR/skills"
     if [ ! -e "$OPENHANDS_DIR/skills/cnt2d" ] && [ ! -L "$OPENHANDS_DIR/skills/cnt2d" ]; then

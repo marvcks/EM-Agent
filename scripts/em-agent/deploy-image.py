@@ -30,6 +30,8 @@ BDE_MOUNTS = {f'/opt/em-agent-tools/{name}': f'/opt/em-agent-tools/{name}' for n
 MORPHOLOGY_MOUNTS = {'/opt/em-agent-tools/crystal-morphology': '/opt/em-agent-tools/crystal-morphology',
                      '/opt/em-agent-tools/python': '/opt/em-agent-tools/python'}
 ANALYSIS_MOUNTS = {f'/opt/em-agent-tools/{name}': f'/opt/em-agent-tools/{name}' for name in ('python', 'analysis')}
+IMAGE_CNN_MOUNTS = {'/opt/em-agent-tools/image-cnn': '/opt/em-agent-tools/image-cnn',
+                    '/opt/em-agent-tools/python': '/opt/em-agent-tools/python'}
 CNT2D_MOUNTS = {'/opt/em-agent-tools/cnt2d': '/opt/em-agent-tools/cnt2d',
                 '/opt/em-agent-tools/python': '/opt/em-agent-tools/python'}
 EDITRETRO_MOUNTS = {f'/opt/em-agent-tools/{name}': f'/opt/em-agent-tools/{name}' for name in ('python', 'editretro')}
@@ -75,7 +77,7 @@ def run(*args, input=None):
     return result.stdout
 
 
-def render_compose(original, image_id, remove_frontend=True, science_tools=False, reaction_tools=False, bde_tools=False, morphology_tools=False, analysis_tools=False, cnt2d_tools=False, editretro_tools=False, molgen_tools=False):
+def render_compose(original, image_id, remove_frontend=True, science_tools=False, reaction_tools=False, bde_tools=False, morphology_tools=False, analysis_tools=False, cnt2d_tools=False, editretro_tools=False, molgen_tools=False, image_cnn_tools=False):
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id):
         raise ValueError('Expected an immutable local image ID')
     if len(re.findall(r'^    image:.*$', original, flags=re.M)) != 1:
@@ -92,7 +94,7 @@ def render_compose(original, image_id, remove_frontend=True, science_tools=False
             if destination in result:
                 raise ValueError(f'Another mount owns {destination}')
             additions.append(line)
-    tool_mounts = {**(SCIENCE_MOUNTS if science_tools else {}), **(REACTION_MOUNTS if reaction_tools else {}), **(BDE_MOUNTS if bde_tools else {}), **(MORPHOLOGY_MOUNTS if morphology_tools else {}), **(ANALYSIS_MOUNTS if analysis_tools else {}), **(CNT2D_MOUNTS if cnt2d_tools else {}), **(EDITRETRO_MOUNTS if editretro_tools else {}), **(MOLGEN_MOUNTS if molgen_tools else {})}
+    tool_mounts = {**(IMAGE_CNN_MOUNTS if image_cnn_tools else {}), **(SCIENCE_MOUNTS if science_tools else {}), **(REACTION_MOUNTS if reaction_tools else {}), **(BDE_MOUNTS if bde_tools else {}), **(MORPHOLOGY_MOUNTS if morphology_tools else {}), **(ANALYSIS_MOUNTS if analysis_tools else {}), **(CNT2D_MOUNTS if cnt2d_tools else {}), **(EDITRETRO_MOUNTS if editretro_tools else {}), **(MOLGEN_MOUNTS if molgen_tools else {})}
     if tool_mounts:
         for source, destination in tool_mounts.items():
             line = f'      - {source}:{destination}:ro\n'
@@ -208,6 +210,18 @@ def deploy(root, image, commit):
                     ('.venv/bin/python', 'manifest.json', 'models/model_results_cache.pkl')]
         if not all(path.is_file() and path.stat().st_size > 0 for path in required):
             raise RuntimeError('Prepare the isolated crystal-morphology runtime and verified model cache before deploying')
+    # @spec IC-005 — Image classifier has its own frozen runtime and model mount.
+    image_cnn_tools = labels.get('io.em-agent.image-cnn') == '1'
+    if image_cnn_tools:
+        runtime = Path('/opt/em-agent-tools/image-cnn')
+        if not all((runtime / name).is_file() for name in ['.venv/bin/python', 'model.pth', 'example.png', 'manifest.json']):
+            raise RuntimeError('Prepare the isolated image-CNN runtime before deploying')
+        manifest = json.loads((runtime / 'manifest.json').read_text())
+        expected_lock = run('docker', 'run', '--rm', '--entrypoint', 'cat', info['Id'], '/opt/agent-canvas/science_apps/runtime/image-cnn/uv.lock')
+        if manifest.get('lock_sha256') != hashlib.sha256(expected_lock.encode()).hexdigest():
+            raise RuntimeError('Image-CNN runtime lock does not match the candidate image')
+        if manifest.get('model_sha256') != hashlib.sha256((runtime / 'model.pth').read_bytes()).hexdigest():
+            raise RuntimeError('Image-CNN checkpoint checksum mismatch')
     # @spec AR-004 — Candidate image and persistent runtime share the exact lock.
     analysis_tools = labels.get('io.em-agent.analysis') == '1'
     if analysis_tools:
@@ -257,7 +271,7 @@ def deploy(root, image, commit):
         expected_lock = run('docker', 'run', '--rm', '--entrypoint', 'cat', info['Id'], '/opt/agent-canvas/science_apps/runtime/molgen/uv.lock')
         if manifest.get('lock_sha256') != hashlib.sha256(expected_lock.encode()).hexdigest():
             raise RuntimeError('Molecular-generation runtime lock does not match the candidate image')
-    candidate = render_compose(original, info['Id'], science_tools=science_tools, reaction_tools=reaction_tools, bde_tools=bde_tools, morphology_tools=morphology_tools, analysis_tools=analysis_tools, cnt2d_tools=cnt2d_tools, editretro_tools=editretro_tools, molgen_tools=molgen_tools)
+    candidate = render_compose(original, info['Id'], science_tools=science_tools, reaction_tools=reaction_tools, bde_tools=bde_tools, morphology_tools=morphology_tools, analysis_tools=analysis_tools, cnt2d_tools=cnt2d_tools, editretro_tools=editretro_tools, molgen_tools=molgen_tools, image_cnn_tools=image_cnn_tools)
     fallback = render_compose(original, previous['Image'], remove_frontend=False)
     atomic_write(release / 'compose-candidate.yaml', candidate)
     atomic_write(release / 'compose-rollback.yaml', fallback)
