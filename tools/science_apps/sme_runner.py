@@ -10,7 +10,6 @@ sensitivity of the trained model, not a causal chemical statement.
 """
 import csv
 import hashlib
-import io
 import json
 import math
 import os
@@ -415,7 +414,8 @@ def _verify_structures(molecules, task, schemes):
 # @spec SME-004 — Verified per-molecule predictions and fragment attributions
 def verified_sme(result, request, directory=None):
     if (result.get('verified') is not True or result.get('app_id') != APP_ID
-            or result.get('task') not in TASKS):
+            or result.get('task') not in TASKS
+            or not isinstance(result.get('ensemble_metrics', {}), dict)):
         return False
     task = result['task']
     if result.get('kind') != TASKS[task]['kind']:
@@ -511,6 +511,7 @@ def run_job(request_path, root=ROOT):
         'task_label': task['label'], 'kind': task['kind'],
         'fragmentations': schemes, 'seed_count': len(models),
         'model_metrics': task_entry.get('metrics', {}),
+        'ensemble_metrics': task_entry.get('ensemble_metrics', {}),
         'provenance': {
             'manifest_created_at': manifest.get('created_at'),
             'training_source': manifest.get('source', {}),

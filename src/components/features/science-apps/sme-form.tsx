@@ -357,8 +357,9 @@ export function SMEResult({
   const kind = result.kind ?? "regression";
   const metric =
     kind === "classification"
-      ? result.model_metrics?.test_accuracy_mean
-      : result.model_metrics?.test_r2_mean;
+      ? (result.ensemble_metrics?.accuracy ??
+        result.model_metrics?.test_accuracy_mean)
+      : (result.ensemble_metrics?.r2 ?? result.model_metrics?.test_r2_mean);
   return (
     <div className="em-bde-result">
       {kind === "classification" ? (

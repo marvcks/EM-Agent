@@ -267,6 +267,13 @@ export interface ScienceJob {
     seed_count?: number;
     fragmentations?: string[];
     model_metrics?: Record<string, number>;
+    ensemble_metrics?: {
+      accuracy?: number;
+      r2?: number;
+      mae?: number;
+      rmse?: number;
+      seed_count?: number;
+    };
     molecules?: ScienceSMEMolecule[];
   };
   exit_code: number | null;
