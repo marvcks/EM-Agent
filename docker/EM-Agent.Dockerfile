@@ -52,6 +52,7 @@ LABEL io.em-agent.cnt2d="1"
 LABEL io.em-agent.image-cnn="1"
 LABEL io.em-agent.editretro="1"
 LABEL io.em-agent.molgen="1"
+LABEL io.em-agent.sme="1"
 ENV AGENT_CANVAS_BUILD_GIT_SHA=${SOURCE_COMMIT}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${SOURCE_COMMIT}
 USER root
@@ -87,5 +88,7 @@ RUN install -m 755 /opt/agent-canvas/science_apps/image-cnn-predict /usr/local/b
  && install -m 755 /opt/agent-canvas/science_apps/em-cnt2d /usr/local/bin/em-cnt2d \
  && install -m 755 /opt/agent-canvas/science_apps/editretro-predict /usr/local/bin/editretro-predict \
  && install -m 755 /opt/agent-canvas/science_apps/molgen-generate /usr/local/bin/molgen-generate \
- && install -m 755 /opt/agent-canvas/science_apps/em-molgen /usr/local/bin/em-molgen
+ && install -m 755 /opt/agent-canvas/science_apps/em-molgen /usr/local/bin/em-molgen \
+ && install -m 755 /opt/agent-canvas/science_apps/sme-predict /usr/local/bin/sme-predict \
+ && install -m 755 /opt/agent-canvas/science_apps/em-sme /usr/local/bin/em-sme
 USER openhands

@@ -533,6 +533,9 @@ export default [
             "em-science-toolbar",
             "em-science-upload",
             "em-science-workbench",
+            "em-science-sme-molecule",
+            "em-science-sme-images",
+            "em-science-sme-fragment",
             // Selector target for has-[.conversation-overview-diffs-git-action:hover].
             "conversation-overview-diffs-git-action",
           ],

@@ -154,3 +154,10 @@ aside[data-collapsed="false"] [data-testid="sidebar-conversations-link"] { backg
 .em-bde-table caption { text-align: left; padding: 12px 0; }
 .em-bde-table th, .em-bde-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--oh-border); }
 .em-bde-table tr[data-minimum="true"] { background: var(--oh-interactive-selected); font-weight: 600; }
+
+.em-science-sme-molecule { display: flex; flex-direction: column; gap: 12px; padding-top: 6px; border-top: 1px solid var(--oh-border-subtle); }
+.em-science-sme-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.em-science-sme-images figure { margin: 0; border: 1px solid var(--oh-border-subtle); border-radius: 9px; overflow: hidden; background: #fff; }
+.em-science-sme-images img { display: block; width: 100%; }
+.em-science-sme-images figcaption { font-size: 10px; color: var(--oh-muted); padding: 6px 8px; overflow-wrap: anywhere; }
+.em-science-sme-fragment { display: flex; flex-direction: column; gap: 8px; }

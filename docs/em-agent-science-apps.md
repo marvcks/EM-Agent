@@ -354,3 +354,49 @@ em-mineru download JOB_ID ./mineru-results
 
 沿用串行队列、最多10项、最多8核/8192MB；固定内存申请2048MB（不是OS硬隔离）。
 手动900秒，Agent监控决定停止；重启不自动恢复任务。
+
+## SME 分子性质预测与结构掩蔽解释
+
+入口：**科学应用 → 分子性质 → SME 分子性质解释**（`/canvas/science-apps/sme`）。
+输入 1–10 个连通分子 SMILES（每行一个，单个最多 128 个重原子），选择性质任务与
+片段划分方式；盐、混合物（含 `.`）和无法被 RDKit 解析的 SMILES 会被拒绝。
+每个任务使用 10 个随机种子 RGCN 模型，输出预测均值和标准差；分类任务额外输出
+P(类别 1) 与 0.5 阈值类别。
+
+任务：`Density_R`（密度）、`DV_R`（爆速）、`DV_C`（爆速分类）、`IS_R`（撞击感度）、
+`IS_C`（撞击感度分类）、`MP`（熔点）、`ESOL`（水溶解度）。资料包没有单位表，页面
+按数据集原始数值展示；配对数据中 DV_C 正类对应 DV_R ≥ 8.8、IS_C 正类对应
+IS_R ≥ 7.4，这是从标签推断的，不是资料包声明的官方阈值。
+
+解释：SME 依次屏蔽（在读出层把原子权重置零）BRICS 片段、Murcko 骨架/侧链和官能团
+原子，计算“完整分子预测 − 屏蔽后预测”的多种子均值，并用 tanh 归一化到 [-1, 1]
+着色。它是**模型扰动敏感性**，不是化学因果关系；无 BRICS 可切键的分子会返回整分子
+片段（贡献为 0），这是方法定义。页面与 ZIP 中提供每个分子的 `mol_XX_{scheme}.png`
+着色结构图、`fragments.csv` 和 `predictions.csv`。
+
+模型来源：资料包自带的 `model/*.pth` 权重在记录架构下无法复现其 `result/` 中的
+报告指标（多个分类模型低于多数类基线），因此服务模型由
+`scripts/em-agent/sme_train.py` 使用资料包的 `data/origin_data` 划分与文献超参数
+重新训练，训练脚本、数据校验和、逐种子 train/valid/test 指标写入
+`/opt/em-agent-tools/sme/manifest.json`；ESOL 的 `hyperparameter` pickle 未随包提供，
+其超参数由 checkpoint 架构推断并在 manifest 中标记。模型仍是数据包范围内的估计，
+未做实验验证，也不构成对真实合成或安全性质的保证。
+
+运行方式：`sme-predict` 调用同一 `/api/science` 队列；手动页面任务限 900 秒，Agent
+提交无平台总时长上限；单任务最多 8 核/申请 8192 MB。10 个分子 × 3 种划分通常
+在一分钟内完成；片段数超过 80/分子/划分会拒绝任务。
+
+Agent 新对话加载 `sme` 技能，经同一队列提交：
+
+```sh
+em-sme submit --task DV_C --smiles 'Cc1c([N+](=O)[O-])cc([N+](=O)[O-])cc1[N+](=O)[O-]'
+em-sme submit --task DV_R --smiles-file molecules.smi --fragmentation all
+em-sme status JOB_ID
+em-sme cancel JOB_ID
+em-sme download JOB_ID ./sme-results
+```
+
+运行时在 `/opt/em-agent-tools/sme` 用
+`tools/science_apps/runtime/sme/{pyproject.toml,uv.lock}` 构建（Torch 2.5.1 CPU +
+RDKit 2024.9.6 + NumPy 1.26.4，Python 3.11）；模型与 manifest 不进入 Git，由
+`scripts/em-agent/install-sme-runtime.sh` 和 `scripts/em-agent/sme_train.py` 准备。

@@ -35,12 +35,14 @@ import { MinerUForm } from "./mineru-form";
 import { MorphologyForm, MorphologyResult } from "./morphology-form";
 import { CNT2DForm, CNT2DResult } from "./cnt2d-form";
 import { MolgenForm, MolgenResult } from "./molgen-form";
+import { SMEForm, SMEResult } from "./sme-form";
 
 import { ImageCNNForm, ImageCNNResult } from "./image-cnn-form";
 
 const DESCRIPTION_KEYS = {
   "image-cnn": I18nKey.SCIENCE$IMAGE_DESCRIPTION,
   molgen: I18nKey.SCIENCE$MOLGEN_DESCRIPTION,
+  sme: I18nKey.SCIENCE$SME_DESCRIPTION,
   editretro: I18nKey.SCIENCE$EDITRETRO_DESCRIPTION,
   cnt2d: I18nKey.SCIENCE$CNT_DESCRIPTION,
   mineru: I18nKey.SCIENCE$MINERU_DESCRIPTION,
@@ -80,6 +82,7 @@ const ERROR_KEYS: Record<string, I18nKey> = {
   invalid_volume: I18nKey.SCIENCE$VOLUME_ERROR,
   invalid_morphology_input: I18nKey.SCIENCE$MORPHOLOGY_INPUT_ERROR,
   invalid_molgen_input: I18nKey.SCIENCE$MOLGEN_INPUT_ERROR,
+  invalid_sme_input: I18nKey.SCIENCE$SME_INPUT_ERROR,
 };
 const CATEGORY_KEYS = {
   thermal: I18nKey.SCIENCE$CNT_CATEGORY,
@@ -91,6 +94,7 @@ const CATEGORY_KEYS = {
   crystal: I18nKey.SCIENCE$CRYSTAL,
   reaction: I18nKey.SCIENCE$REACTION,
   generation: I18nKey.SCIENCE$MOLGEN_CATEGORY,
+  property: I18nKey.SCIENCE$SME_CATEGORY,
 };
 const SCIENCE_CATEGORIES = [
   "all",
@@ -102,6 +106,7 @@ const SCIENCE_CATEGORIES = [
   "crystal",
   "reaction",
   "generation",
+  "property",
 ] as const;
 const OFF23_MODEL_SIZES = ["small", "medium", "large"] as const;
 const SEARCH_FIELDS = [
@@ -291,6 +296,12 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                   onCreated={onSelectJob}
                   renderError={(error) => <ErrorMessage error={error} />}
                 />
+              ) : selected.id === "sme" ? (
+                <SMEForm
+                  app={selected}
+                  onCreated={onSelectJob}
+                  renderError={(error) => <ErrorMessage error={error} />}
+                />
               ) : selected.category === "reaction" ? (
                 <ReactionForm
                   key={selected.id}
@@ -402,7 +413,8 @@ export function ScienceAppsPage({ appId, jobId, onSelectJob }: Props) {
                                 ? I18nKey.SCIENCE$MOLGEN_NO_INPUT
                                 : app.id === "crystal-morphology"
                                   ? I18nKey.SCIENCE$MORPHOLOGY_TABLE_INPUT
-                                  : app.category === "reaction"
+                                  : app.category === "reaction" ||
+                                      app.id === "sme"
                                     ? I18nKey.SCIENCE$SMILES_INPUT
                                     : I18nKey.SCIENCE$XYZ_INPUT,
                       )}
@@ -946,6 +958,9 @@ function JobResult({ jobId }: { jobId: string | null }) {
           {job.app_id === "molgen" &&
             job.status === "succeeded" &&
             job.result && <MolgenResult result={job.result} />}
+          {job.app_id === "sme" && job.status === "succeeded" && job.result && (
+            <SMEResult jobId={job.id} result={job.result} />
+          )}
           {job.app_id === "crystal-morphology" &&
             job.status === "succeeded" &&
             job.result && <MorphologyResult result={job.result} />}

@@ -23,6 +23,7 @@ export const SCIENCE_APP_IDS = [
   "lcms2yield",
   "bde",
   "molgen",
+  "sme",
 ] as const;
 export const SCIENCE_MORPHOLOGY_FEATURES = [
   "添加剂百分比",
@@ -33,6 +34,26 @@ export const SCIENCE_MORPHOLOGY_FEATURES = [
 ] as const;
 export const SCIENCE_MORPHOLOGY_EXAMPLE_CSV =
   "添加剂百分比,反溶剂温度(°C),搅拌速率(rpm),浓度(g/ml),溶剂/反溶剂比值\n1,10,300,0.06,0.125\n5,5,300,0.06,0.167\n";
+export const SCIENCE_SME_TASKS = [
+  "DV_R",
+  "Density_R",
+  "DV_C",
+  "IS_R",
+  "IS_C",
+  "MP",
+  "ESOL",
+] as const;
+export const SCIENCE_SME_FRAGMENTATIONS = [
+  "all",
+  "brics",
+  "murcko",
+  "fg",
+] as const;
+export const SCIENCE_SME_EXAMPLE =
+  "Cc1c([N+](=O)[O-])cc([N+](=O)[O-])cc1[N+](=O)[O-]\nO=[N+]([O-])N1CN([N+](=O)[O-])CN([N+](=O)[O-])C1";
+export type ScienceSMETask = (typeof SCIENCE_SME_TASKS)[number];
+export type ScienceSMEFragmentation =
+  (typeof SCIENCE_SME_FRAGMENTATIONS)[number];
 export const SCIENCE_ROUTE_EXAMPLE = "CC(=O)Oc1ccccc1C(=O)O";
 export const SCIENCE_EDITRETRO_EXAMPLE =
   "Cc1csc(Nc2ncc(SC(C)c3ccccn3)cc2Oc2cc(C(=O)NCCN(C)C)ccc2Cl)n1";
@@ -78,7 +99,8 @@ export interface ScienceApplication {
     | "reaction"
     | "bond"
     | "document"
-    | "generation";
+    | "generation"
+    | "property";
   available: boolean;
   methods: string[];
   bases: string[];
@@ -108,7 +130,8 @@ export interface ScienceJobRequest {
     | "textify"
     | "classification"
     | "conduction"
-    | "generation";
+    | "generation"
+    | "prediction";
   document_name?: string;
   language?: "en" | "ch";
   enable_formula?: boolean;
@@ -141,6 +164,27 @@ export interface ScienceJobRequest {
   molgen_workers?: number;
   molgen_seconds?: number;
   molgen_seed?: number;
+  sme_task?: ScienceSMETask;
+  sme_fragmentation?: ScienceSMEFragmentation;
+}
+export interface ScienceSMEFragment {
+  index: number;
+  label: string;
+  atoms: number[];
+  atom_count: number;
+  attribution: number;
+  attribution_std: number;
+  attribution_normalized: number;
+  masked_prediction_mean: number;
+}
+export interface ScienceSMEMolecule {
+  index: number;
+  smiles: string;
+  atom_count: number;
+  prediction: { mean: number; std: number; seeds?: number[] };
+  probability_class1?: number;
+  label?: 0 | 1;
+  schemes: Record<string, { image: string; fragments: ScienceSMEFragment[] }>;
 }
 export interface ScienceJob {
   id: string;
@@ -218,6 +262,12 @@ export interface ScienceJob {
       sa_score: number | null;
       heavy_atom_count: number | null;
     }[];
+    task_label?: string;
+    kind?: "regression" | "classification";
+    seed_count?: number;
+    fragmentations?: string[];
+    model_metrics?: Record<string, number>;
+    molecules?: ScienceSMEMolecule[];
   };
   exit_code: number | null;
 }
@@ -291,5 +341,11 @@ export const scienceAppsService = {
     link.download = name;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+  preview: async (id: string, name: string) => {
+    const response = await request(
+      `/jobs/${encodeURIComponent(id)}/files/${encodeURIComponent(name)}`,
+    );
+    return URL.createObjectURL(await response.blob());
   },
 };

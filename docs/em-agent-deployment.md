@@ -289,3 +289,23 @@ Python3.11.15，CPU Torch2.10.0/torchvision0.25.0，NumPy2.4.2/Pillow13.0.0。
 下载源慢时可设置 `IMAGE_CNN_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple`，
 通过冻结版本与发行文件哈希切换传输，不改版本。推理前再次校验权重与运行时锁。
 镜像只包含适配器、CLI与使用技能；权重和环境不进Git或镜像。保留同名用户技能。
+
+## SME 性质模型挂载
+
+带 `io.em-agent.sme=1` 标签的镜像部署时独立检查 `/opt/em-agent-tools/sme` 的
+`.venv/bin/python`、`manifest.json`、`runtime.json`，以及 manifest 中列出的全部
+模型文件，再添加 `/opt/em-agent-tools/sme` 与共享 `/opt/em-agent-tools/python` 的
+同路径只读挂载；既有软件、会话、数据和 scratch 挂载不变。运行时用仓库内
+`tools/science_apps/runtime/sme/{pyproject.toml,uv.lock}`（Torch 2.5.1 CPU、
+RDKit 2024.9.6、NumPy 1.26.4）在 `/opt/em-agent-tools/sme` 构建：
+
+```sh
+uv sync --frozen --no-dev --project /opt/em-agent-tools/sme \
+  --python /opt/em-agent-tools/python/cpython-3.11.15-linux-x86_64-gnu/bin/python3
+```
+
+`runtime.json` 记录锁文件散列，`manifest.json` 记录逐任务种子权重散列与
+train/valid/test 指标。部署校验 `runtime.json.lock_sha256` 与候选镜像内的
+`uv.lock` 一致，避免把旧运行时挂到新镜像；模型权重、数据和训练产物不进入 Git。
+启动时仅在无同名用户技能时链接 `sme` 技能。模型由资料包数据重新训练的原因和
+验证记录见 `docs/em-agent-science-apps.md` 的 SME 小节及本地部署报告。

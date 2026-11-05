@@ -33,6 +33,7 @@ from .image_cnn_runner import image_cnn_available, validate_image_cnn, verified_
 from .cnt2d_runner import cnt2d_available, validate_cnt2d, verified_cnt2d
 from .editretro_runner import editretro_available, validate_editretro, verified_editretro
 from .molgen_runner import molgen_available, validate_molgen, verified_molgen
+from .sme_runner import sme_available, validate_sme, verified_sme
 
 PREFIX = '/api/science'
 MAX_LOG_BYTES = 10 * 1024 * 1024
@@ -52,6 +53,7 @@ APPLICATIONS = {
     'magus': {'name': 'MAGUS', 'executable': 'magus-mace', 'methods': ['MACE-OFF23'], 'bases': [], 'category': 'crystal'},
     'aizynthfinder': {'name': 'AiZynthFinder', 'executable': 'aizynth-route', 'methods': ['USPTO'], 'bases': [], 'category': 'reaction'},
     'lcms2yield': {'name': 'lcms2yield', 'executable': 'lcms-cf', 'methods': ['UV-CF 20250721'], 'bases': [], 'category': 'reaction'},
+    'sme': {'name': 'SME 分子性质解释', 'executable': 'sme-predict', 'methods': ['RGCN'], 'bases': [], 'category': 'property'},
     'crystal-morphology': {'name': '晶体形貌判别', 'executable': 'morphology-classify',
                            'methods': ['auto', 'CatBoost', 'LightGBM', 'XGBoost', 'SVM', 'GradientBoosting', 'RandomForest'],
                            'bases': [], 'category': 'crystal'},
@@ -74,6 +76,8 @@ def application_executable(app_id):
         return None
     if app_id == 'crystal-morphology' and not morphology_available():
         return None
+    if app_id == 'sme' and not sme_available():
+        return None
     if app_id in REACTION_APPS and not runtime_available(app_id):
         return None
     if app_id == 'magus' and (not os.access(RUNTIME_PYTHON, os.X_OK) or
@@ -84,7 +88,7 @@ def application_executable(app_id):
 
 class JobRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    app_id: Literal['image-cnn', 'xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology', 'cnt2d', 'editretro', 'molgen']
+    app_id: Literal['image-cnn', 'xtb', 'orca', 'gaussian', 'magus', 'aizynthfinder', 'lcms2yield', 'bde', 'mineru', 'crystal-morphology', 'cnt2d', 'editretro', 'molgen', 'sme']
     image_base64: str = Field(default='', max_length=699052)
     image_example: bool = False
     top_k: int = Field(default=20, ge=1, le=20)
@@ -101,7 +105,9 @@ class JobRequest(BaseModel):
     input_kind: Literal['smiles', 'name'] = 'smiles'
     compound_name: str = Field(default='', max_length=256)
     title: str = Field(default='', max_length=80)
-    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde', 'textify', 'classification', 'conduction', 'generation'] = 'energy'
+    task: Literal['energy', 'optimize', 'search', 'retrosynthesis', 'correction_factor', 'bde', 'textify', 'classification', 'conduction', 'generation', 'prediction'] = 'energy'
+    sme_task: Literal['Density_R', 'DV_R', 'DV_C', 'IS_R', 'IS_C', 'MP', 'ESOL'] = 'DV_R'
+    sme_fragmentation: Literal['all', 'brics', 'murcko', 'fg'] = 'all'
     method: str = ''
     basis: str = ''
     charge: int = Field(default=0, ge=-10, le=10)
@@ -198,6 +204,10 @@ def prepare_input(request):
     if request.app_id == 'crystal-morphology':
         request.method = method
         validate_morphology(request)
+        return 'request.json', request.model_dump_json(indent=2), ['request.json']
+    if request.app_id == 'sme':
+        request.method = method
+        validate_sme(request)
         return 'request.json', request.model_dump_json(indent=2), ['request.json']
     if request.smiles or request.task not in {'energy', 'optimize', 'search'}:
         raise ValueError('invalid_method')
@@ -359,7 +369,7 @@ class Manager:
         # PyTorch multiprocessing uses Unix sockets beneath TMPDIR. Persistent
         # job paths exceed AF_UNIX's path limit, so reaction jobs get a short,
         # private scratch path. The same finally block removes it on stop/failure.
-        if request.app_id in REACTION_APPS or request.app_id in ('editretro', 'molgen'):
+        if request.app_id in REACTION_APPS or request.app_id in ('editretro', 'molgen', 'sme'):
             scratch = Path(tempfile.mkdtemp(prefix='em-science-', dir='/tmp'))
         else:
             scratch = directory / 'scratch'
@@ -398,7 +408,7 @@ class Manager:
                        'editretro': 'EM_AGENT_EDITRETRO_COMPLETE',
                        'aizynthfinder': 'EM_AGENT_REACTION_COMPLETE', 'lcms2yield': 'EM_AGENT_REACTION_COMPLETE', 'bde': 'EM_AGENT_BDE_COMPLETE', 'mineru': 'EM_AGENT_MINERU_COMPLETE',
                        'crystal-morphology': 'EM_AGENT_MORPHOLOGY_COMPLETE', 'cnt2d': 'EM_AGENT_CNT2D_COMPLETE',
-                       'molgen': 'EM_AGENT_MOLGEN_COMPLETE'}
+                       'molgen': 'EM_AGENT_MOLGEN_COMPLETE', 'sme': 'EM_AGENT_SME_COMPLETE'}
             if job['status'] != 'cancelled':
                 success = job['exit_code'] == 0 and markers[job['app_id']].lower() in text.lower() and not job['error']
                 if success and job['app_id'] == 'magus':
@@ -448,6 +458,11 @@ class Manager:
                     success = (verified_molgen(result, request)
                                and (directory / 'results.zip').is_file()
                                and (directory / 'molecules.csv').is_file())
+                    if success:
+                        job['result'] = result
+                if success and job['app_id'] == 'sme':
+                    result = json.loads((directory / 'result.json').read_text())
+                    success = verified_sme(result, request, directory)
                     if success:
                         job['result'] = result
                 job['status'] = 'succeeded' if success else 'failed'

@@ -22,6 +22,7 @@ vi.mock("#/api/science-apps-service", async (importOriginal) => ({
     submitDocument: vi.fn(),
     cancel: vi.fn(),
     download: vi.fn(),
+    preview: vi.fn(),
   },
 }));
 const applications: ScienceApplication[] = [
@@ -133,6 +134,17 @@ const applications: ScienceApplication[] = [
     timeout_seconds: 900,
   },
   {
+    id: "sme",
+    name: "SME 分子性质解释",
+    category: "property",
+    available: true,
+    methods: ["RGCN"],
+    bases: [],
+    max_cores: 8,
+    max_memory_mb: 8192,
+    timeout_seconds: 900,
+  },
+  {
     id: "xtb",
     name: "xTB",
     category: "semiempirical",
@@ -188,6 +200,7 @@ beforeEach(() => {
   vi.mocked(scienceAppsService.jobs).mockResolvedValue([]);
   vi.mocked(scienceAppsService.job).mockResolvedValue(job);
   vi.mocked(scienceAppsService.submit).mockResolvedValue(job);
+  vi.mocked(scienceAppsService.preview).mockResolvedValue("blob:sme-image");
   vi.mocked(scienceAppsService.submitDocument).mockResolvedValue({
     ...job,
     app_id: "mineru",
@@ -694,6 +707,85 @@ describe("manual scientific applications", () => {
     );
     expect(screen.getByText("SCIENCE$MORPHOLOGY_COUNTS")).toBeInTheDocument();
     expect(screen.getByRole("table")).toHaveTextContent("0.700");
+  });
+
+  // @spec SME-002 — SMILES-only submission with task and fragmentation selection
+  it("submits an SME property task and renders fragment attributions", async () => {
+    const user = userEvent.setup();
+    vi.mocked(scienceAppsService.job).mockResolvedValue({
+      ...job,
+      app_id: "sme",
+      status: "succeeded",
+      result: {
+        task_label: "爆速",
+        kind: "regression",
+        seed_count: 10,
+        fragmentations: ["brics"],
+        model_metrics: { test_r2_mean: 0.93 },
+        molecules: [
+          {
+            index: 1,
+            smiles: "CCO",
+            atom_count: 3,
+            prediction: { mean: 8.4, std: 0.1 },
+            schemes: {
+              brics: {
+                image: "mol_01_brics.png",
+                fragments: [
+                  {
+                    index: 1,
+                    label: "CCO",
+                    atoms: [0, 1, 2],
+                    atom_count: 3,
+                    attribution: 0.4,
+                    attribution_std: 0.02,
+                    attribution_normalized: 0.38,
+                    masked_prediction_mean: 8,
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    });
+    renderWithProviders(
+      <ScienceAppsPage appId="sme" jobId="abc" onSelectJob={vi.fn()} />,
+    );
+    await screen.findByTestId("science-submit");
+    const textarea = screen.getByLabelText("SCIENCE$SME_INPUT");
+    await user.type(textarea, "CCO");
+    await user.selectOptions(screen.getByLabelText("SCIENCE$SME_TASK"), "DV_C");
+    await user.selectOptions(
+      screen.getByLabelText("SCIENCE$SME_FRAGMENTATION"),
+      "brics",
+    );
+    await user.click(screen.getByTestId("science-submit"));
+    await waitFor(() =>
+      expect(scienceAppsService.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          app_id: "sme",
+          task: "prediction",
+          method: "RGCN",
+          smiles: "CCO",
+          sme_task: "DV_C",
+          sme_fragmentation: "brics",
+          xyz: "",
+        }),
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByText("SCIENCE$SME_TEST_R2")).toBeInTheDocument();
+    expect(screen.getByRole("table")).toHaveTextContent("0.380");
+    expect(screen.getByRole("table")).toHaveTextContent("8.000");
+    expect(await screen.findByAltText("SCIENCE$SME_IMAGE")).toHaveAttribute(
+      "src",
+      "blob:sme-image",
+    );
+    expect(scienceAppsService.preview).toHaveBeenCalledWith(
+      "abc",
+      "mol_01_brics.png",
+    );
   });
 
   it("submits a batch CSV in the fixed five-column format", async () => {
