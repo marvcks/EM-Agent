@@ -27,7 +27,7 @@ import time
 import numpy as np
 import torch as th
 
-from tools.science_apps.sme_runner import TASKS, _graph_arrays
+from tools.science_apps.sme_runner import TASKS, _graph_arrays, _predict, _tensor_params
 
 PACKAGE = '资料1031/可解释模型_1030'
 # @spec SME-001 — Documented per-task hyperparameters; ESOL's pickle was not shipped
@@ -233,6 +233,7 @@ def train_one(data_dir, models_dir, task, seed_index, threads=3):
     epoch = 0
     for epoch in range(hyper['epochs']):
         model.train()
+        optimizer = th.optim.Adam(model.parameters(), lr=hyper['lr'])
         order = np.random.permutation(train_index)
         for start in range(0, len(order), batch_size):
             chunk = order[start:start + batch_size]
@@ -243,7 +244,6 @@ def train_one(data_dir, models_dir, task, seed_index, threads=3):
                     prediction, truth, pos_weight=pos_weight).mean()
             else:
                 loss = th.nn.functional.mse_loss(prediction, truth).mean()
-            optimizer = th.optim.Adam(model.parameters(), lr=hyper['lr'])
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -278,6 +278,41 @@ def split_counts(data_path, task):
             if row.get('group') in counts:
                 counts[row['group']] += 1
     return counts
+
+
+def evaluate_ensemble(data_dir, models_dir, task):
+    """Score the mean of all seed models on the held-out split."""
+    from rdkit import Chem
+    rows = load_task(data_dir, task)
+    kind = TASKS[task]['kind']
+    classification = kind == 'classification'
+    graphs = prepare_graphs(rows)
+    labels = np.asarray([label for _, label, _ in rows], dtype=float)
+    groups = [group for _, _, group in rows]
+    test_index = [index for index, group in enumerate(groups) if group == 'test']
+    predictions = []
+    for path in sorted(Path(models_dir).glob(f'{task}_*.pt')):
+        state = th.load(path, map_location='cpu', weights_only=True)['model_state_dict']
+        params = _tensor_params(state, th)
+        seed_predictions = []
+        for index in test_index:
+            mol = Chem.MolFromSmiles(rows[index][0])
+            mask = th.ones(mol.GetNumAtoms())
+            with th.no_grad():
+                raw = _predict(params, graphs[index]['arrays'], mask, th)
+            seed_predictions.append(1.0 / (1.0 + math.exp(-raw)) if classification else raw)
+        predictions.append(seed_predictions)
+    mean = np.mean(np.asarray(predictions), axis=0)
+    truth = labels[test_index]
+    if classification:
+        return {'accuracy': float(((mean >= 0.5) == truth.astype(bool)).mean()),
+                'seed_count': len(predictions)}
+    residual = ((truth - mean) ** 2).sum()
+    total = ((truth - truth.mean()) ** 2).sum()
+    return {'r2': float(1 - residual / total) if total else 0.0,
+            'mae': float(np.abs(truth - mean).mean()),
+            'rmse': float(np.sqrt(residual / len(truth))),
+            'seed_count': len(predictions)}
 
 
 def update_manifest(manifest_path, models_dir, data_dir, tasks, results):
@@ -331,11 +366,23 @@ def main():
     parser.add_argument('--workers', type=int, default=8)
     parser.add_argument('--threads', type=int, default=3)
     parser.add_argument('--force', action='store_true')
+    parser.add_argument('--evaluate-only', action='store_true',
+                        help='score the stored seed ensembles and update the manifest')
     arguments = parser.parse_args()
     th.set_num_threads(arguments.threads)
     tasks = [task for task in arguments.tasks if task in HYPERPARAMETERS]
     if not tasks:
         raise SystemExit('no matching tasks')
+    if arguments.evaluate_only:
+        manifest = json.loads(arguments.manifest.read_text())
+        for task in tasks:
+            metrics = evaluate_ensemble(arguments.data_dir, arguments.models_dir, task)
+            manifest['tasks'][task]['ensemble_metrics'] = metrics
+            print(json.dumps({'task': task, 'ensemble': metrics}), flush=True)
+        temporary = arguments.manifest.with_name(arguments.manifest.name + '.next')
+        temporary.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
+        temporary.replace(arguments.manifest)
+        return
     results = {task: [] for task in tasks}
     jobs = [(task, seed) for task in tasks for seed in range(arguments.seeds)]
     with ProcessPoolExecutor(max_workers=arguments.workers) as pool:
