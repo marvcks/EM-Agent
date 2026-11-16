@@ -14,7 +14,7 @@ import torch
 from fairseq import checkpoint_utils, tasks, utils
 import editretro  # Register the upstream task before fairseq upgrades checkpoint args.
 
-EXPECTED_MODEL_SHA256 = '3a537dc6a8992dd61c02993485d8f89c83a7169e63ccb956dab88b949327daf8'
+EXPECTED_MODEL_SHA256 = 'cd3ae89fa70acc4b2708878a3f4fdcc859c3ac93188b4d45b6bc4d7ebc448ea0'
 
 
 def digest(path):

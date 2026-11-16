@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import zipfile
 
 ROOT = Path('/opt/em-agent-tools/editretro')
-MODEL_SHA256 = '3a537dc6a8992dd61c02993485d8f89c83a7169e63ccb956dab88b949327daf8'
+MODEL_SHA256 = 'cd3ae89fa70acc4b2708878a3f4fdcc859c3ac93188b4d45b6bc4d7ebc448ea0'
 UPSTREAM_COMMIT = '8e5848e899b4e8ec6be970b9be04881042ed7b55'
 
 

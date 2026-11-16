@@ -31,12 +31,13 @@ class ScienceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 JobRequest(**{**request.model_dump(), **change})
         result = {'app_id': 'editretro', 'verified': True, 'device': 'cpu',
-                  'model_sha256': '3a537dc6a8992dd61c02993485d8f89c83a7169e63ccb956dab88b949327daf8',
+                  'model_sha256': 'cd3ae89fa70acc4b2708878a3f4fdcc859c3ac93188b4d45b6bc4d7ebc448ea0',
                   'input_smiles': request.smiles, 'top_k': 2, 'augmentations': 5,
                   'prediction_count': 1,
                   'candidates': [{'rank': 1, 'smiles': 'CCN.CC(=O)O', 'reactants': ['CCN', 'CC(=O)O']}]}
         self.assertTrue(verified_editretro(result, request))
         for change in ({'candidates': []}, {'prediction_count': 2}, {'input_smiles': 'CCO'},
+                       {'model_sha256': '3a537dc6a8992dd61c02993485d8f89c83a7169e63ccb956dab88b949327daf8'},
                        {'model_sha256': 'wrong'}, {'augmentations': 20},
                        {'candidates': [{'rank': 2, 'smiles': 'CCN', 'reactants': ['CCN']}]}):
             with self.subTest(change=change):
